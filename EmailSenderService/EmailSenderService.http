@@ -1,0 +1,42 @@
+@host = http://localhost:5158
+
+# Obtain a token from Keycloak. For a confidential client use client_credentials as below;
+# for a user-facing client use the Swagger UI Authorize button instead.
+# @name token
+POST http://localhost:8080/realms/master/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials&client_id=email-sender&client_secret=REPLACE_ME
+
+###
+
+@accessToken = {{token.response.body.access_token}}
+
+### Plain text
+POST {{host}}/api/email/send
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "to": ["someone@example.com"],
+  "subject": "Deployment finished",
+  "body": "Release 1.4.2 is live.",
+  "isHtml": false
+}
+
+### HTML with cc and reply-to
+POST {{host}}/api/email/send
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "to": ["someone@example.com", "other@example.com"],
+  "cc": ["team@example.com"],
+  "replyTo": "support@example.com",
+  "subject": "Weekly report",
+  "body": "<h1>Weekly report</h1><p>All systems <strong>nominal</strong>.</p>",
+  "isHtml": true
+}
+
+### Readiness (anonymous)
+GET {{host}}/healthz/ready

@@ -1,0 +1,45 @@
+{{/*
+Non-secret configuration only. ASP.NET Core reads __ as the section separator, so
+Smtp__Host lands in the same place as "Smtp": { "Host": ... } in appsettings.json,
+overriding it. The SMTP password is never here - it arrives from Vault at runtime.
+*/}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "email-sender.fullname" . }}
+  labels:
+    {{- include "email-sender.labels" . | nindent 4 }}
+data:
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_HTTP_PORTS: "8080"
+
+  Swagger__Enabled: {{ .Values.swagger.enabled | quote }}
+
+  Smtp__Host: {{ .Values.smtp.host | quote }}
+  Smtp__Port: {{ .Values.smtp.port | quote }}
+  Smtp__Security: {{ .Values.smtp.security | quote }}
+  Smtp__FromAddress: {{ .Values.smtp.fromAddress | quote }}
+  Smtp__FromDisplayName: {{ .Values.smtp.fromDisplayName | quote }}
+  Smtp__TimeoutSeconds: {{ .Values.smtp.timeoutSeconds | quote }}
+  Smtp__AcceptInvalidCertificates: {{ .Values.smtp.acceptInvalidCertificates | quote }}
+  {{- with .Values.smtp.userName }}
+  Smtp__UserName: {{ . | quote }}
+  {{- end }}
+
+  Keycloak__Authority: {{ .Values.keycloak.authority | quote }}
+  Keycloak__Audience: {{ .Values.keycloak.audience | quote }}
+  Keycloak__ValidateAudience: {{ .Values.keycloak.validateAudience | quote }}
+  Keycloak__RequireHttpsMetadata: {{ .Values.keycloak.requireHttpsMetadata | quote }}
+  Keycloak__RequiredRole: {{ .Values.keycloak.requiredRole | quote }}
+  Keycloak__RolesClientId: {{ .Values.keycloak.rolesClientId | quote }}
+  Keycloak__SwaggerClientId: {{ .Values.keycloak.swaggerClientId | quote }}
+
+  Vault__Enabled: {{ .Values.vault.enabled | quote }}
+  Vault__Address: {{ .Values.vault.address | quote }}
+  Vault__AuthMethod: {{ .Values.vault.authMethod | quote }}
+  Vault__KubernetesRole: {{ .Values.vault.kubernetesRole | quote }}
+  Vault__KubernetesAuthMountPoint: {{ .Values.vault.kubernetesAuthMountPoint | quote }}
+  Vault__MountPoint: {{ .Values.vault.mountPoint | quote }}
+  Vault__SecretPath: {{ .Values.vault.secretPath | quote }}
+  Vault__Optional: {{ .Values.vault.optional | quote }}
+  Vault__ReloadInterval: {{ .Values.vault.reloadInterval | quote }}

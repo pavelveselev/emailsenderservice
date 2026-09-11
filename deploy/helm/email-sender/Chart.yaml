@@ -1,0 +1,11 @@
+apiVersion: v2
+name: email-sender
+description: Central email relay API - SMTP credentials from HashiCorp Vault, callers authenticated by Keycloak
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - email
+  - smtp
+  - vault
+  - keycloak

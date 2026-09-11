@@ -1,0 +1,38 @@
+{{ include "email-sender.fullname" . }} deployed.
+
+Endpoint:
+{{- if .Values.ingress.enabled }}
+{{- range $host := .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host.host }}/api/email/send
+{{- end }}
+{{- else }}
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "email-sender.fullname" . }} 8080:{{ .Values.service.port }}
+  then POST to http://localhost:8080/api/email/send
+{{- end }}
+{{- if .Values.swagger.enabled }}
+  Swagger UI is at /swagger.
+{{- end }}
+
+Callers need a Keycloak token from {{ .Values.keycloak.authority }} carrying the
+{{- if .Values.keycloak.rolesClientId }} client role "{{ .Values.keycloak.requiredRole }}" of client "{{ .Values.keycloak.rolesClientId }}"
+{{- else }} realm role "{{ .Values.keycloak.requiredRole }}"{{ end }}.
+
+{{- if .Values.vault.enabled }}
+
+Vault must have the SMTP credentials at {{ .Values.vault.mountPoint }}/{{ .Values.vault.secretPath }}
+with keys "username" and "password", and a role that trusts this workload:
+
+  vault kv put {{ .Values.vault.mountPoint }}/{{ .Values.vault.secretPath }} username=... password=...
+
+  vault write auth/{{ .Values.vault.kubernetesAuthMountPoint }}/role/{{ .Values.vault.kubernetesRole }} \
+      bound_service_account_names={{ include "email-sender.serviceAccountName" . }} \
+      bound_service_account_namespaces={{ .Release.Namespace }} \
+      policies=email-sender ttl=1h
+
+Check the overlay actually arrived:
+  kubectl --namespace {{ .Release.Namespace }} exec deploy/{{ include "email-sender.fullname" . }} -- \
+      wget -qO- localhost:8080/healthz/ready
+{{- else }}
+
+Vault is disabled - the service will run on whatever credentials are in configuration.
+{{- end }}

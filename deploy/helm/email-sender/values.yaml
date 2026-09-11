@@ -1,0 +1,110 @@
+replicaCount: 2
+
+image:
+  repository: email-sender
+  # Defaults to the chart's appVersion when empty.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Must exist and be bound to the Vault role named in vault.kubernetesRole -
+  # that binding is what lets the pod authenticate to Vault without a stored token.
+  create: true
+  name: ""
+  annotations: {}
+
+podAnnotations: {}
+podLabels: {}
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: email-sender.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+# Transport settings only. Credentials come from Vault; do not put a password here.
+smtp:
+  host: smtp.example.com
+  port: 587
+  # None | Auto | SslOnConnect | StartTls | StartTlsWhenAvailable
+  security: StartTls
+  fromAddress: noreply@example.com
+  fromDisplayName: Notifications
+  timeoutSeconds: 30
+  acceptInvalidCertificates: false
+  # Set only if the Vault secret does not carry a "username" key.
+  userName: ""
+
+keycloak:
+  authority: https://keycloak.example.com/realms/corp
+  audience: email-sender
+  # Keycloak omits the client from `aud` unless the client has an audience mapper.
+  # Add that mapper, or set this to false.
+  validateAudience: true
+  requireHttpsMetadata: true
+  # Realm role (or client role, when rolesClientId is set) required to send mail.
+  requiredRole: email-sender
+  rolesClientId: email-sender
+  swaggerClientId: email-sender-swagger
+
+vault:
+  enabled: true
+  address: http://vault.vault.svc.cluster.local:8200
+  # Kubernetes | Token
+  authMethod: Kubernetes
+  kubernetesRole: email-sender
+  kubernetesAuthMountPoint: kubernetes
+  # KV v2 mount and path. Keys map onto Smtp options by name: username, password, host, port.
+  mountPoint: secret
+  secretPath: email-sender/smtp
+  # false = a Vault outage at startup crashes the pod instead of silently running
+  # on incomplete configuration.
+  optional: false
+  reloadInterval: "00:05:00"
+  # Only for authMethod: Token on dev clusters. Reference a pre-existing Secret;
+  # the chart never creates one.
+  tokenSecret:
+    name: ""
+    key: token
+
+swagger:
+  enabled: true
+
+# Extra environment variables, e.g. Logging__LogLevel__Default.
+extraEnv: []
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
