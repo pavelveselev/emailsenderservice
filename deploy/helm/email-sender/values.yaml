@@ -11,12 +11,13 @@ nameOverride: ""
 fullnameOverride: ""
 
 serviceAccount:
-  # Must exist and be bound to the Vault role named in vault.kubernetesRole -
-  # that binding is what lets the pod authenticate to Vault without a stored token.
+  # Give the pod its own identity, so whatever supplies the SMTP credentials
+  # (a Vault role binding, an external-secrets store) can be scoped to this workload.
   create: true
   name: ""
   annotations: {}
 
+# Vault Agent / Vault Secrets Operator injector annotations go here.
 podAnnotations: {}
 podLabels: {}
 
@@ -42,7 +43,7 @@ resources:
   limits:
     memory: 256Mi
 
-# Transport settings only. Credentials come from Vault; do not put a password here.
+# Transport settings only - do not put a password here, it would land in the ConfigMap.
 smtp:
   host: smtp.example.com
   port: 587
@@ -52,40 +53,29 @@ smtp:
   fromDisplayName: Notifications
   timeoutSeconds: 30
   acceptInvalidCertificates: false
-  # Set only if the Vault secret does not carry a "username" key.
+  # Set only when the credentials Secret carries no user name key.
   userName: ""
+  # Credentials are read from an existing Secret that this chart never creates - fill it
+  # however you already manage secrets (Vault Agent injector, Vault Secrets Operator,
+  # external-secrets). Leave name empty for a relay that needs no authentication.
+  credentialsSecret:
+    name: ""
+    # Keys within that Secret. Leave userNameKey empty to keep smtp.userName above.
+    userNameKey: username
+    passwordKey: password
 
+# Callers are other services presenting a Keycloak client-credentials token; this service
+# only validates it, so no client secret or redirect URI is needed here.
 keycloak:
   authority: https://keycloak.example.com/realms/corp
   audience: email-sender
-  # Keycloak omits the client from `aud` unless the client has an audience mapper.
+  # Keycloak omits the client from `aud` unless the calling client has an audience mapper.
   # Add that mapper, or set this to false.
   validateAudience: true
   requireHttpsMetadata: true
-  # Realm role (or client role, when rolesClientId is set) required to send mail.
+  # Realm role (or client role, when rolesClientId is set) the calling service account must hold.
   requiredRole: email-sender
   rolesClientId: email-sender
-  swaggerClientId: email-sender-swagger
-
-vault:
-  enabled: true
-  address: http://vault.vault.svc.cluster.local:8200
-  # Kubernetes | Token
-  authMethod: Kubernetes
-  kubernetesRole: email-sender
-  kubernetesAuthMountPoint: kubernetes
-  # KV v2 mount and path. Keys map onto Smtp options by name: username, password, host, port.
-  mountPoint: secret
-  secretPath: email-sender/smtp
-  # false = a Vault outage at startup crashes the pod instead of silently running
-  # on incomplete configuration.
-  optional: false
-  reloadInterval: "00:05:00"
-  # Only for authMethod: Token on dev clusters. Reference a pre-existing Secret;
-  # the chart never creates one.
-  tokenSecret:
-    name: ""
-    key: token
 
 swagger:
   enabled: true

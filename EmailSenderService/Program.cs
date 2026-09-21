@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using EmailSenderService.Configuration;
 using EmailSenderService.Health;
 using EmailSenderService.Options;
 using EmailSenderService.Security;
@@ -12,10 +11,6 @@ using Microsoft.OpenApi;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Vault is layered on top of appsettings/environment variables, so SMTP credentials never
-// have to exist in a ConfigMap, an image, or a developer's checkout.
-builder.Configuration.AddVaultSecrets();
-
 if (!builder.Environment.IsDevelopment())
 {
     // One JSON object per line is what cluster log collectors expect.
@@ -25,6 +20,8 @@ if (!builder.Environment.IsDevelopment())
 var keycloakOptions = builder.Configuration.GetSection(KeycloakOptions.SectionName).Get<KeycloakOptions>()
                       ?? new KeycloakOptions();
 
+// Smtp:UserName and Smtp:Password are expected to arrive as environment variables projected
+// from a Kubernetes Secret, so they never sit in appsettings or the ConfigMap.
 builder.Services.AddOptions<SmtpOptions>()
     .Bind(builder.Configuration.GetSection(SmtpOptions.SectionName))
     .ValidateDataAnnotations()
@@ -35,12 +32,10 @@ builder.Services.AddOptions<KeycloakOptions>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
-builder.Services.Configure<VaultOptions>(builder.Configuration.GetSection(VaultOptions.SectionName));
-
 builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 
-// Behind an ingress the original scheme arrives in X-Forwarded-Proto; without this the OAuth
-// redirect URIs Swagger builds come out as http and Keycloak rejects them.
+// Behind an ingress the original scheme and client address arrive in X-Forwarded-*; without
+// this every request is logged as plain http from the ingress controller's own IP.
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -48,6 +43,8 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.KnownProxies.Clear();
 });
 
+// Bearer tokens only. Callers are other services holding a Keycloak client-credentials token;
+// there is no interactive sign-in, so no OIDC handler, cookies, or redirect URIs are involved.
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -62,7 +59,9 @@ builder.Services
             ValidateAudience = keycloakOptions.ValidateAudience,
             ValidAudience = keycloakOptions.Audience,
             ValidateLifetime = true,
-            NameClaimType = "preferred_username",
+            // A service account token names the calling client in `azp`; that, not a person's
+            // username, is the identity worth carrying into the logs.
+            NameClaimType = "azp",
             RoleClaimType = ClaimTypes.Role
         };
         options.Events = new JwtBearerEvents
@@ -98,32 +97,23 @@ builder.Services.AddSwaggerGen(options =>
     {
         Title = "Email Sender Service",
         Version = "v1",
-        Description = "Sends mail through a central relay. SMTP credentials are held in HashiCorp "
-                      + "Vault and never leave this service; callers authenticate with Keycloak."
+        Description = "Sends mail through a central relay. SMTP credentials are held by this "
+                      + "service alone; callers authenticate with a Keycloak service account token."
     });
 
-    options.AddSecurityDefinition("keycloak", new OpenApiSecurityScheme
+    options.AddSecurityDefinition("bearer", new OpenApiSecurityScheme
     {
-        Type = SecuritySchemeType.OAuth2,
-        Description = "Keycloak authorization code flow with PKCE.",
-        Flows = new OpenApiOAuthFlows
-        {
-            AuthorizationCode = new OpenApiOAuthFlow
-            {
-                AuthorizationUrl = new Uri(keycloakOptions.AuthorizationUrl, UriKind.RelativeOrAbsolute),
-                TokenUrl = new Uri(keycloakOptions.TokenUrl, UriKind.RelativeOrAbsolute),
-                Scopes = new Dictionary<string, string>
-                {
-                    ["openid"] = "OpenID Connect scope",
-                    ["profile"] = "User profile"
-                }
-            }
-        }
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        In = ParameterLocation.Header,
+        Description = "Keycloak access token from the client credentials grant: POST "
+                      + "{authority}/protocol/openid-connect/token with grant_type=client_credentials."
     });
 
     options.AddSecurityRequirement(document => new OpenApiSecurityRequirement
     {
-        [new OpenApiSecuritySchemeReference("keycloak", document)] = ["openid", "profile"]
+        [new OpenApiSecuritySchemeReference("bearer", document)] = []
     });
 
     var xmlPath = Path.Combine(AppContext.BaseDirectory, $"{typeof(Program).Assembly.GetName().Name}.xml");
@@ -135,21 +125,13 @@ builder.Services.AddSwaggerGen(options =>
 
 var app = builder.Build();
 
-VaultConfigurationDiagnostics.Drain(app.Services.GetRequiredService<ILogger<Program>>());
-
 app.UseForwardedHeaders();
 app.UseExceptionHandler();
 
 if (app.Configuration.GetValue("Swagger:Enabled", true))
 {
     app.UseSwagger();
-    app.UseSwaggerUI(options =>
-    {
-        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Email Sender Service v1");
-        options.OAuthClientId(keycloakOptions.SwaggerClientId ?? keycloakOptions.Audience);
-        options.OAuthScopes("openid", "profile");
-        options.OAuthUsePkce();
-    });
+    app.UseSwaggerUI(options => options.SwaggerEndpoint("/swagger/v1/swagger.json", "Email Sender Service v1"));
 }
 
 app.UseAuthentication();

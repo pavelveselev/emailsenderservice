@@ -20,8 +20,8 @@ public sealed class SmtpEmailSender(
 {
     public async Task<SendEmailResponse> SendAsync(SendEmailRequest request, CancellationToken cancellationToken)
     {
-        // Read through the monitor on every send so credentials rotated in Vault take effect
-        // without a restart.
+        // Read through the monitor on every send so a rotated credential takes effect as soon
+        // as the configuration source behind it reloads.
         var options = optionsMonitor.CurrentValue;
         var message = BuildMessage(request, options);
 

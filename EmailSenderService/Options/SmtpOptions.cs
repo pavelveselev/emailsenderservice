@@ -5,8 +5,8 @@ namespace EmailSenderService.Options;
 
 /// <summary>
 /// SMTP transport settings. Host/port/security normally come from appsettings or the Helm
-/// ConfigMap; <see cref="UserName"/> and <see cref="Password"/> are expected to be overlaid
-/// from Vault at startup (see <c>Configuration/VaultConfigurationProvider</c>).
+/// ConfigMap; <see cref="UserName"/> and <see cref="Password"/> are expected to arrive as
+/// environment variables projected from a Kubernetes Secret, never from a ConfigMap.
 /// </summary>
 public sealed class SmtpOptions
 {

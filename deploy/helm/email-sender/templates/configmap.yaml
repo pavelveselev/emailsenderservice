@@ -1,7 +1,7 @@
 {{/*
 Non-secret configuration only. ASP.NET Core reads __ as the section separator, so
 Smtp__Host lands in the same place as "Smtp": { "Host": ... } in appsettings.json,
-overriding it. The SMTP password is never here - it arrives from Vault at runtime.
+overriding it. The SMTP password is never here - it comes from a Secret as an env var.
 */}}
 apiVersion: v1
 kind: ConfigMap
@@ -32,14 +32,3 @@ data:
   Keycloak__RequireHttpsMetadata: {{ .Values.keycloak.requireHttpsMetadata | quote }}
   Keycloak__RequiredRole: {{ .Values.keycloak.requiredRole | quote }}
   Keycloak__RolesClientId: {{ .Values.keycloak.rolesClientId | quote }}
-  Keycloak__SwaggerClientId: {{ .Values.keycloak.swaggerClientId | quote }}
-
-  Vault__Enabled: {{ .Values.vault.enabled | quote }}
-  Vault__Address: {{ .Values.vault.address | quote }}
-  Vault__AuthMethod: {{ .Values.vault.authMethod | quote }}
-  Vault__KubernetesRole: {{ .Values.vault.kubernetesRole | quote }}
-  Vault__KubernetesAuthMountPoint: {{ .Values.vault.kubernetesAuthMountPoint | quote }}
-  Vault__MountPoint: {{ .Values.vault.mountPoint | quote }}
-  Vault__SecretPath: {{ .Values.vault.secretPath | quote }}
-  Vault__Optional: {{ .Values.vault.optional | quote }}
-  Vault__ReloadInterval: {{ .Values.vault.reloadInterval | quote }}

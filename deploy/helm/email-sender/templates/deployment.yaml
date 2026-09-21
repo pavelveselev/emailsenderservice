@@ -29,8 +29,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "email-sender.serviceAccountName" . }}
-      # The projected token of this service account is what Vault's Kubernetes auth
-      # method verifies, so it must stay mounted.
+      # Left mounted so an in-cluster secrets injector can authenticate as this workload.
       automountServiceAccountToken: true
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
@@ -48,12 +47,23 @@ spec:
             - configMapRef:
                 name: {{ include "email-sender.fullname" . }}
           env:
-            {{- if and (eq .Values.vault.authMethod "Token") .Values.vault.tokenSecret.name }}
-            - name: Vault__Token
+            # Credentials as env vars from a Secret the chart does not own; an `env` entry
+            # outranks the same key coming from `envFrom`, so this wins over the ConfigMap.
+            {{- with .Values.smtp.credentialsSecret }}
+            {{- if .name }}
+            {{- with .userNameKey }}
+            - name: Smtp__UserName
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.vault.tokenSecret.name }}
-                  key: {{ .Values.vault.tokenSecret.key }}
+                  name: {{ $.Values.smtp.credentialsSecret.name }}
+                  key: {{ . }}
+            {{- end }}
+            - name: Smtp__Password
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .name }}
+                  key: {{ .passwordKey }}
+            {{- end }}
             {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
@@ -64,8 +74,9 @@ spec:
               port: http
             periodSeconds: 10
           readinessProbe:
-            # Reports unhealthy when the Vault overlay is missing, which keeps a
-            # misconfigured pod out of the Service rather than failing sends.
+            # Reports unhealthy while required configuration or the credential Secret is
+            # missing, which keeps a misconfigured pod out of the Service rather than
+            # failing sends.
             httpGet:
               path: /healthz/ready
               port: http
