@@ -17,6 +17,11 @@ if (!builder.Environment.IsDevelopment())
     builder.Logging.AddJsonConsole();
 }
 
+// Kestrel refuses request bodies over 30 MB unless told otherwise, and a message body arrives
+// inline in the JSON, so that default is also the ceiling on the size of a letter.
+var maxBodyMegabytes = builder.Configuration.GetValue("RequestLimits:MaxBodyMegabytes", 100L);
+builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = maxBodyMegabytes * 1024 * 1024);
+
 var keycloakOptions = builder.Configuration.GetSection(KeycloakOptions.SectionName).Get<KeycloakOptions>()
                       ?? new KeycloakOptions();
 

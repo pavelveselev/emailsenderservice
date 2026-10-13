@@ -15,6 +15,8 @@ data:
 
   Swagger__Enabled: {{ .Values.swagger.enabled | quote }}
 
+  RequestLimits__MaxBodyMegabytes: {{ .Values.requestLimits.maxBodyMegabytes | quote }}
+
   Smtp__Host: {{ .Values.smtp.host | quote }}
   Smtp__Port: {{ .Values.smtp.port | quote }}
   Smtp__Security: {{ .Values.smtp.security | quote }}

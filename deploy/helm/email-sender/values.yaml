@@ -36,12 +36,21 @@ ingress:
           pathType: Prefix
   tls: []
 
+# A request is held in memory several times over while it is turned into a MIME message
+# (JSON buffer, UTF-16 string, encoded body), so budget roughly 6x the largest body per
+# concurrent send and keep the limit in step with requestLimits.maxBodyMegabytes.
 resources:
   requests:
     cpu: 50m
     memory: 128Mi
   limits:
-    memory: 256Mi
+    memory: 1Gi
+
+requestLimits:
+  # Largest request body the API accepts. The relay's own SIZE limit and any ingress body
+  # limit (ingress-nginx: nginx.ingress.kubernetes.io/proxy-body-size, default 1m) apply
+  # separately and must be raised to match.
+  maxBodyMegabytes: 100
 
 # Transport settings only - do not put a password here, it would land in the ConfigMap.
 smtp:
