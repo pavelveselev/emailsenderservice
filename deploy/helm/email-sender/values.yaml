@@ -28,6 +28,11 @@ service:
 ingress:
   enabled: false
   className: ""
+  # Rendered as nginx.ingress.kubernetes.io/proxy-body-size (ingress-nginx defaults to 1m,
+  # which would turn most attachments into a 413 from nginx). Empty derives it from
+  # requestLimits.maxBodyMegabytes, the largest body the API itself accepts; an annotation
+  # with the same key under `annotations` takes precedence.
+  proxyBodySize: ""
   annotations: {}
   hosts:
     - host: email-sender.example.com
@@ -36,21 +41,41 @@ ingress:
           pathType: Prefix
   tls: []
 
-# A request is held in memory several times over while it is turned into a MIME message
-# (JSON buffer, UTF-16 string, encoded body), so budget roughly 6x the largest body per
-# concurrent send and keep the limit in step with requestLimits.maxBodyMegabytes.
+# Memory: a JSON request is held in memory several times over while it is turned into a
+# MIME message (JSON buffer, UTF-16 string, encoded body), so budget roughly 6x
+# requestLimits.maxBodyMegabytes per concurrent large JSON send: 30 MiB x 6 = ~180 MiB.
+# Multipart uploads cost little memory - files over 64 KB are buffered to /tmp and streamed
+# from there through the size check and onto the wire. 512Mi covers a ~100 MiB runtime
+# baseline plus two worst-case JSON sends at once; raise it with maxBodyMegabytes.
 resources:
   requests:
     cpu: 50m
     memory: 128Mi
   limits:
-    memory: 1Gi
+    memory: 512Mi
 
 requestLimits:
-  # Largest request body the API accepts. The relay's own SIZE limit and any ingress body
-  # limit (ingress-nginx: nginx.ingress.kubernetes.io/proxy-body-size, default 1m) apply
-  # separately and must be raised to match.
-  maxBodyMegabytes: 100
+  # Largest JSON request body the API accepts. The relay takes at most smtp.maxMessageBytes
+  # and encoding only grows text, so a larger body could never be sent. The multipart action
+  # has its own fixed 25 MiB cap. An ingress body limit applies separately (ingress.proxyBodySize).
+  maxBodyMegabytes: 30
+
+# /tmp is an emptyDir (the root filesystem is read-only). ASP.NET Core buffers every uploaded
+# file over 64 KB there for the life of the request, up to 25 MiB per multipart request, so
+# 256Mi holds about ten maximum-size uploads in flight. Exceeding sizeLimit gets the pod
+# evicted rather than failing one write, hence the headroom; scale it with concurrency.
+tmpVolume:
+  sizeLimit: 256Mi
+
+# Per-message file limits, enforced with a 400 before anything is built. Raw bytes grow by
+# ~1.37x as base64, so the 20 MiB total becomes ~28.7 MB of a 30,000,000-byte message.
+attachments:
+  maxCount: 10
+  maxTotalBytes: 20971520
+  maxFileBytes: 20971520
+  # Empty keeps the built-in list: .pdf .doc .docx .xls .xlsx .odt .ods .txt .csv .png .jpg
+  # .jpeg .zip. A list here replaces it entirely.
+  allowedExtensions: []
 
 # Transport settings only - do not put a password here, it would land in the ConfigMap.
 smtp:
@@ -62,6 +87,9 @@ smtp:
   fromDisplayName: Notifications
   timeoutSeconds: 30
   acceptInvalidCertificates: false
+  # The relay's message size limit (its SIZE). Messages are measured fully encoded before
+  # connecting; a larger one is refused with 413 instead of being bounced by the relay as 502.
+  maxMessageBytes: 30000000
   # Set only when the credentials Secret carries no user name key.
   userName: ""
   # Credentials are read from an existing Secret that this chart never creates - fill it

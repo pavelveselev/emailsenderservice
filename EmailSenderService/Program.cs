@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using EmailSenderService.Health;
+using EmailSenderService.OpenApi;
 using EmailSenderService.Options;
 using EmailSenderService.Security;
 using EmailSenderService.Services;
@@ -17,9 +18,11 @@ if (!builder.Environment.IsDevelopment())
     builder.Logging.AddJsonConsole();
 }
 
-// Kestrel refuses request bodies over 30 MB unless told otherwise, and a message body arrives
-// inline in the JSON, so that default is also the ceiling on the size of a letter.
-var maxBodyMegabytes = builder.Configuration.GetValue("RequestLimits:MaxBodyMegabytes", 100L);
+// Cap for the JSON action, whose body text arrives inline. The relay takes at most
+// Smtp:MaxMessageBytes (30 MB) and encoding only grows text, so a larger JSON body could never
+// be sent - accepting it would just buffer several copies of a request bound to fail. The
+// multipart action sets its own, lower cap (AttachmentOptions.MultipartRequestBytes).
+var maxBodyMegabytes = builder.Configuration.GetValue("RequestLimits:MaxBodyMegabytes", 30L);
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = maxBodyMegabytes * 1024 * 1024);
 
 var keycloakOptions = builder.Configuration.GetSection(KeycloakOptions.SectionName).Get<KeycloakOptions>()
@@ -37,7 +40,18 @@ builder.Services.AddOptions<KeycloakOptions>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
+builder.Services.AddOptions<AttachmentOptions>()
+    .Bind(builder.Configuration.GetSection(AttachmentOptions.SectionName))
+    .ValidateDataAnnotations()
+    .Validate(options => options.MaxFileBytes <= options.MaxTotalBytes,
+        "Attachments:MaxFileBytes must not exceed Attachments:MaxTotalBytes.")
+    .Validate(options => options.MaxTotalBytes < AttachmentOptions.MultipartRequestBytes,
+        $"Attachments:MaxTotalBytes must stay below the multipart request cap of {AttachmentOptions.MultipartRequestBytes} bytes.")
+    .ValidateOnStart();
+
 builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
+builder.Services.AddSingleton<ISmtpTransport, SmtpTransport>();
+builder.Services.AddSingleton<AttachmentValidator>();
 
 // Behind an ingress the original scheme and client address arrive in X-Forwarded-*; without
 // this every request is logged as plain http from the ingress controller's own IP.
@@ -91,6 +105,7 @@ builder.Services.AddAuthorizationBuilder()
 builder.Services.AddControllers();
 builder.Services.AddProblemDetails();
 builder.Services.AddExceptionHandler<EmailDeliveryExceptionHandler>();
+builder.Services.AddExceptionHandler<PayloadTooLargeExceptionHandler>();
 
 builder.Services.AddHealthChecks()
     .AddCheck<SmtpConfigurationHealthCheck>("smtp-configuration", tags: ["ready"]);
@@ -121,7 +136,12 @@ builder.Services.AddSwaggerGen(options =>
         [new OpenApiSecuritySchemeReference("bearer", document)] = []
     });
 
-    var xmlPath = Path.Combine(AppContext.BaseDirectory, $"{typeof(Program).Assembly.GetName().Name}.xml");
+    // POST api/email/send has a JSON and a multipart action; document them as one operation
+    // with two request body media types.
+    options.ResolveConflictingActions(ContentTypeVariantsOperationFilter.Resolve);
+    options.OperationFilter<ContentTypeVariantsOperationFilter>();
+
+    var xmlPath =Path.Combine(AppContext.BaseDirectory, $"{typeof(Program).Assembly.GetName().Name}.xml");
     if (File.Exists(xmlPath))
     {
         options.IncludeXmlComments(xmlPath);

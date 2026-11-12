@@ -34,6 +34,14 @@ public sealed class SmtpOptions
     [Range(1, 600)]
     public int TimeoutSeconds { get; set; } = 30;
 
+    /// <summary>
+    /// Largest message the relay accepts, measured as it goes on the wire. The built message is
+    /// checked against this before connecting, so an oversized one is a 413 from this API rather
+    /// than a 502 from the relay. Keep it in step with the relay's SIZE limit.
+    /// </summary>
+    [Range(1L, long.MaxValue)]
+    public long MaxMessageBytes { get; set; } = 30_000_000;
+
     /// <summary>Accept untrusted server certificates. Intended for test relays only.</summary>
     public bool AcceptInvalidCertificates { get; set; }
 }

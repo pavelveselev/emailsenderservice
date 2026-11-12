@@ -24,8 +24,16 @@ data:
   Smtp__FromDisplayName: {{ .Values.smtp.fromDisplayName | quote }}
   Smtp__TimeoutSeconds: {{ .Values.smtp.timeoutSeconds | quote }}
   Smtp__AcceptInvalidCertificates: {{ .Values.smtp.acceptInvalidCertificates | quote }}
+  Smtp__MaxMessageBytes: {{ .Values.smtp.maxMessageBytes | int64 | quote }}
   {{- with .Values.smtp.userName }}
   Smtp__UserName: {{ . | quote }}
+  {{- end }}
+
+  Attachments__MaxCount: {{ .Values.attachments.maxCount | quote }}
+  Attachments__MaxTotalBytes: {{ .Values.attachments.maxTotalBytes | int64 | quote }}
+  Attachments__MaxFileBytes: {{ .Values.attachments.maxFileBytes | int64 | quote }}
+  {{- range $index, $extension := .Values.attachments.allowedExtensions }}
+  Attachments__AllowedExtensions__{{ $index }}: {{ $extension | quote }}
   {{- end }}
 
   Keycloak__Authority: {{ .Values.keycloak.authority | quote }}

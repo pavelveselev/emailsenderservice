@@ -91,12 +91,18 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
-            # readOnlyRootFilesystem is on, and the framework still needs somewhere to write.
+            # readOnlyRootFilesystem is on, and the framework still needs somewhere to write -
+            # including uploaded attachments, which are buffered here for the request.
             - name: tmp
               mountPath: /tmp
       volumes:
         - name: tmp
+          {{- with .Values.tmpVolume.sizeLimit }}
+          emptyDir:
+            sizeLimit: {{ . }}
+          {{- else }}
           emptyDir: {}
+          {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

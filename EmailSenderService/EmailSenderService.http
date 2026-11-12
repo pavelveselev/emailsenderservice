@@ -38,5 +38,33 @@ Authorization: Bearer {{accessToken}}
   "isHtml": true
 }
 
+### With attachments: same fields as multipart/form-data, lists as repeated keys
+POST {{host}}/api/email/send
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="to"
+
+someone@example.com
+--boundary
+Content-Disposition: form-data; name="to"
+
+other@example.com
+--boundary
+Content-Disposition: form-data; name="subject"
+
+Quarterly report
+--boundary
+Content-Disposition: form-data; name="body"
+
+The report is attached.
+--boundary
+Content-Disposition: form-data; name="attachments"; filename="report.txt"
+Content-Type: text/plain
+
+Revenue up, costs down.
+--boundary--
+
 ### Readiness (anonymous)
 GET {{host}}/healthz/ready

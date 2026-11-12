@@ -17,22 +17,18 @@ Callers need a Keycloak token from {{ .Values.keycloak.authority }} carrying the
 {{- if .Values.keycloak.rolesClientId }} client role "{{ .Values.keycloak.requiredRole }}" of client "{{ .Values.keycloak.rolesClientId }}"
 {{- else }} realm role "{{ .Values.keycloak.requiredRole }}"{{ end }}.
 
-{{- if .Values.vault.enabled }}
 
-Vault must have the SMTP credentials at {{ .Values.vault.mountPoint }}/{{ .Values.vault.secretPath }}
-with keys "username" and "password", and a role that trusts this workload:
+{{- if .Values.smtp.credentialsSecret.name }}
 
-  vault kv put {{ .Values.vault.mountPoint }}/{{ .Values.vault.secretPath }} username=... password=...
-
-  vault write auth/{{ .Values.vault.kubernetesAuthMountPoint }}/role/{{ .Values.vault.kubernetesRole }} \
-      bound_service_account_names={{ include "email-sender.serviceAccountName" . }} \
-      bound_service_account_namespaces={{ .Release.Namespace }} \
-      policies=email-sender ttl=1h
-
-Check the overlay actually arrived:
+SMTP credentials are read from Secret "{{ .Values.smtp.credentialsSecret.name }}" (keys
+"{{ .Values.smtp.credentialsSecret.userNameKey }}" / "{{ .Values.smtp.credentialsSecret.passwordKey }}"), which this chart does not create.
+Until it exists the pod stays unready. Check it arrived:
   kubectl --namespace {{ .Release.Namespace }} exec deploy/{{ include "email-sender.fullname" . }} -- \
       wget -qO- localhost:8080/healthz/ready
 {{- else }}
 
-Vault is disabled - the service will run on whatever credentials are in configuration.
+No credentials Secret is configured - the relay must accept unauthenticated mail from this pod.
 {{- end }}
+
+Size limits: JSON bodies up to {{ .Values.requestLimits.maxBodyMegabytes }} MiB, multipart up to 25 MiB, built messages
+up to {{ .Values.smtp.maxMessageBytes | int64 }} bytes (larger is a 413, never sent to the relay).

@@ -1,85 +1,75 @@
-using System.Net.Sockets;
 using EmailSenderService.Models;
 using EmailSenderService.Options;
-using MailKit.Net.Smtp;
-using MailKit.Security;
 using Microsoft.Extensions.Options;
 using MimeKit;
+using MimeKit.IO;
 using MimeKit.Utils;
 
 namespace EmailSenderService.Services;
 
 /// <summary>
-/// Sends through MailKit. A fresh <see cref="SmtpClient"/> is created per message on purpose:
-/// MailKit's client is not thread-safe, so a shared instance would have to be locked, which
-/// would serialise every request against a single connection.
+/// Builds the <see cref="MimeMessage"/>, checks it against the relay's size limit and hands it
+/// to <see cref="ISmtpTransport"/>. This API is the only place that limit is enforced before
+/// the relay itself, so the check runs on the fully encoded message, not on an estimate.
 /// </summary>
 public sealed class SmtpEmailSender(
     IOptionsMonitor<SmtpOptions> optionsMonitor,
+    ISmtpTransport transport,
     ILogger<SmtpEmailSender> logger) : IEmailSender
 {
-    public async Task<SendEmailResponse> SendAsync(SendEmailRequest request, CancellationToken cancellationToken)
+    // SMTP puts CRLF on the wire; FormatOptions.Default uses the platform newline, which on
+    // Linux would under-count every line of base64 by one byte.
+    private static readonly FormatOptions WireFormat = CreateWireFormat();
+
+    public async Task<SendEmailResponse> SendAsync(
+        SendEmailRequest request,
+        IReadOnlyList<EmailAttachment>? attachments,
+        CancellationToken cancellationToken)
     {
         // Read through the monitor on every send so a rotated credential takes effect as soon
         // as the configuration source behind it reloads.
         var options = optionsMonitor.CurrentValue;
-        var message = BuildMessage(request, options);
 
-        using var client = new SmtpClient
-        {
-            Timeout = (int)TimeSpan.FromSeconds(options.TimeoutSeconds).TotalMilliseconds
-        };
+        // Not disposed: disposing the message would close the attachment streams, which belong
+        // to the caller and are released by it once this method returns.
+        var message = BuildMessage(request, attachments, options);
 
-        if (options.AcceptInvalidCertificates)
+        var messageBytes = await MeasureAsync(message, cancellationToken);
+        if (messageBytes > options.MaxMessageBytes)
         {
-            client.ServerCertificateValidationCallback = (_, _, _, _) => true;
+            logger.LogWarning("Refused {MessageId}: {MessageBytes} bytes encoded, limit {LimitBytes}",
+                message.MessageId, messageBytes, options.MaxMessageBytes);
+            throw new MessageTooLargeException(messageBytes, options.MaxMessageBytes);
         }
 
-        try
-        {
-            await client.ConnectAsync(options.Host, options.Port, options.Security, cancellationToken);
+        var response = await transport.SendAsync(message, options, cancellationToken);
 
-            if (!string.IsNullOrWhiteSpace(options.UserName))
-            {
-                // Some relays advertise XOAUTH2 and then fail the handshake for password auth.
-                client.AuthenticationMechanisms.Remove("XOAUTH2");
-                await client.AuthenticateAsync(options.UserName, options.Password ?? string.Empty, cancellationToken);
-            }
+        var recipientCount = message.To.Count + message.Cc.Count + message.Bcc.Count;
+        logger.LogInformation(
+            "Sent {MessageId} ({MessageBytes} bytes) to {RecipientCount} recipient(s) via {Host}:{Port}. Relay response: {Response}",
+            message.MessageId, messageBytes, recipientCount, options.Host, options.Port, response);
 
-            var response = await client.SendAsync(message, cancellationToken);
-            await client.DisconnectAsync(quit: true, cancellationToken);
-
-            var recipientCount = message.To.Count + message.Cc.Count + message.Bcc.Count;
-            logger.LogInformation(
-                "Sent {MessageId} to {RecipientCount} recipient(s) via {Host}:{Port}. Relay response: {Response}",
-                message.MessageId, recipientCount, options.Host, options.Port, response);
-
-            return new SendEmailResponse(message.MessageId, recipientCount, DateTimeOffset.UtcNow);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (AuthenticationException ex)
-        {
-            logger.LogError(ex, "SMTP authentication failed for {UserName} at {Host}:{Port}",
-                options.UserName, options.Host, options.Port);
-            throw new EmailDeliveryException("The relay rejected the configured SMTP credentials.", ex);
-        }
-        catch (SmtpCommandException ex)
-        {
-            logger.LogError(ex, "Relay rejected the message ({ErrorCode}, mailbox {Mailbox})", ex.ErrorCode, ex.Mailbox);
-            throw new EmailDeliveryException($"The relay rejected the message: {ex.Message}", ex);
-        }
-        catch (Exception ex) when (ex is SmtpProtocolException or SslHandshakeException or IOException
-                                      or SocketException or TimeoutException)
-        {
-            logger.LogError(ex, "Could not reach the relay at {Host}:{Port}", options.Host, options.Port);
-            throw new EmailDeliveryException("The relay could not be reached.", ex);
-        }
+        return new SendEmailResponse(message.MessageId, recipientCount, DateTimeOffset.UtcNow);
     }
 
-    private static MimeMessage BuildMessage(SendEmailRequest request, SmtpOptions options)
+    /// <summary>
+    /// Fixes every part's transfer encoding for the strictest (7-bit) transport first, so the
+    /// size measured here is what goes on the wire - MailKit's own Prepare leaves explicitly
+    /// encoded parts alone. Bcc is still written here, so the result errs slightly high.
+    /// </summary>
+    private static async Task<long> MeasureAsync(MimeMessage message, CancellationToken cancellationToken)
+    {
+        message.Prepare(EncodingConstraint.SevenBit);
+
+        await using var measuring = new MeasuringStream();
+        await message.WriteToAsync(WireFormat, measuring, cancellationToken);
+        return measuring.Length;
+    }
+
+    private static MimeMessage BuildMessage(
+        SendEmailRequest request,
+        IReadOnlyList<EmailAttachment>? attachments,
+        SmtpOptions options)
     {
         var message = new MimeMessage { MessageId = MimeUtils.GenerateMessageId() };
         message.From.Add(new MailboxAddress(options.FromDisplayName ?? string.Empty, options.FromAddress));
@@ -112,7 +102,41 @@ public sealed class SmtpEmailSender(
             body.TextBody = request.Body;
         }
 
+        // Added as ready-made parts over the caller's stream: BodyBuilder's file and byte
+        // overloads would copy the content into memory. Any attachment makes it multipart/mixed.
+        foreach (var attachment in attachments ?? [])
+        {
+            body.Attachments.Add(CreateAttachmentPart(attachment));
+        }
+
         message.Body = body.ToMessageBody();
         return message;
+    }
+
+    private static MimePart CreateAttachmentPart(EmailAttachment attachment)
+    {
+        var part = new MimePart(ContentType.Parse(attachment.ContentType))
+        {
+            Content = new MimeContent(attachment.Content),
+            ContentTransferEncoding = ContentEncoding.Base64,
+            ContentDisposition = new ContentDisposition(ContentDisposition.Attachment),
+            FileName = attachment.FileName
+        };
+
+        // MimeKit encodes non-ASCII names per RFC 2231 by default, which Outlook shows as
+        // garbage; RFC 2047 encoded-words are what it (and most other clients) decode.
+        foreach (var parameter in part.ContentType.Parameters.Concat(part.ContentDisposition.Parameters))
+        {
+            parameter.EncodingMethod = ParameterEncodingMethod.Rfc2047;
+        }
+
+        return part;
+    }
+
+    private static FormatOptions CreateWireFormat()
+    {
+        var format = FormatOptions.Default.Clone();
+        format.NewLineFormat = NewLineFormat.Dos;
+        return format;
     }
 }
