@@ -14,15 +14,15 @@ using MimeKit;
 namespace EmailSenderService.Tests.Infrastructure;
 
 /// <summary>
-/// Runs the real pipeline (routing, model binding, validation, message building and the size
-/// check) with two seams replaced: authentication accepts a test header instead of a Keycloak
-/// token, and the SMTP transport captures the finished message instead of connecting.
+/// Запускает настоящий конвейер (маршрутизация, привязка модели, валидация, сборка письма и
+/// проверка размера) с двумя заменёнными швами: аутентификация принимает тестовый заголовок
+/// вместо токена Keycloak, а SMTP-транспорт перехватывает готовое письмо вместо подключения.
 /// </summary>
 public sealed class EmailApiFactory : WebApplicationFactory<Program>
 {
     public CapturingSmtpTransport Transport { get; } = new();
 
-    /// <summary>Client with an authenticated caller holding the send role.</summary>
+    /// <summary>Клиент с аутентифицированным вызывающим, у которого есть роль отправки.</summary>
     public HttpClient CreateAuthorizedClient()
     {
         var client = CreateClient();
@@ -30,7 +30,7 @@ public sealed class EmailApiFactory : WebApplicationFactory<Program>
         return client;
     }
 
-    /// <summary>A factory variant with adjusted limits; it shares nothing with this one.</summary>
+    /// <summary>Вариант фабрики с изменёнными лимитами; ничего не разделяет с текущей.</summary>
     public static EmailApiFactory WithOptions(
         Action<SmtpOptions>? smtp = null,
         Action<AttachmentOptions>? attachments = null)
@@ -55,7 +55,7 @@ public sealed class EmailApiFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
-        // Development fills the options that ValidateOnStart requires (Smtp:Host, Keycloak:Authority...).
+        // Development заполняет опции, которых требует ValidateOnStart (Smtp:Host, Keycloak:Authority...).
         builder.UseEnvironment("Development");
 
         builder.ConfigureTestServices(services =>
@@ -77,8 +77,8 @@ public sealed class EmailApiFactory : WebApplicationFactory<Program>
 }
 
 /// <summary>
-/// Authenticates a request that carries <see cref="CallerHeader"/> as that client, with the
-/// role the send policy requires; anything else is anonymous and gets the usual 401 challenge.
+/// Аутентифицирует запрос с заголовком <see cref="CallerHeader"/> как указанного в нём клиента
+/// с ролью, которой требует политика отправки; всё остальное анонимно и получает обычный 401.
 /// </summary>
 public sealed class TestAuthHandler(
     IOptionsMonitor<AuthenticationSchemeOptions> options,
@@ -107,9 +107,9 @@ public sealed class TestAuthHandler(
 }
 
 /// <summary>
-/// Stands in for the relay. Besides the message it keeps the wire bytes, serialised during the
-/// call while the request's upload streams are still open, which proves they were readable
-/// after the size measurement had already consumed them once.
+/// Заменяет релей. Помимо письма сохраняет его байты в сетевом виде, сериализованные во время
+/// вызова, пока потоки загрузки запроса ещё открыты, - это доказывает, что их можно было
+/// прочитать после того, как измерение размера уже прочитало их один раз.
 /// </summary>
 public sealed class CapturingSmtpTransport : ISmtpTransport
 {

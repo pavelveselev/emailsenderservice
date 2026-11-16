@@ -3,18 +3,18 @@ using System.ComponentModel.DataAnnotations;
 namespace EmailSenderService.Options;
 
 /// <summary>
-/// Limits for files sent through the multipart action. They exist so that an oversized or
-/// unwanted upload is refused here with a 400 instead of reaching the relay; the relay's own
-/// size cap is mirrored separately by <see cref="SmtpOptions.MaxMessageBytes"/>.
+/// Лимиты для файлов, отправляемых через multipart-действие. Они нужны, чтобы слишком большая
+/// или нежелательная загрузка отклонялась здесь с 400, а не доходила до релея; собственный
+/// лимит размера релея отдельно отражён в <see cref="SmtpOptions.MaxMessageBytes"/>.
 /// </summary>
 public sealed class AttachmentOptions
 {
     public const string SectionName = "Attachments";
 
     /// <summary>
-    /// Request body cap for the multipart action: attachments, multipart framing and the text
-    /// fields. It is a constant because <c>[RequestSizeLimit]</c> and <c>[RequestFormLimits]</c>
-    /// take compile-time values; start-up validation keeps the configurable limits below it.
+    /// Лимит тела запроса для multipart-действия: вложения, multipart-разметка и текстовые поля.
+    /// Это константа, потому что <c>[RequestSizeLimit]</c> и <c>[RequestFormLimits]</c> принимают
+    /// значения времени компиляции; валидация при старте держит настраиваемые лимиты ниже него.
     /// </summary>
     public const long MultipartRequestBytes = 25 * 1024 * 1024;
 
@@ -30,8 +30,9 @@ public sealed class AttachmentOptions
     public int MaxCount { get; set; } = 10;
 
     /// <summary>
-    /// Raw bytes across all files. Base64 with line breaks grows content by about 1.37x, so
-    /// 20 MiB becomes roughly 28.7 MB of the relay's 30,000,000-byte message cap.
+    /// Исходные байты всех файлов в сумме. Base64 с переносами строк увеличивает содержимое
+    /// примерно в 1.37 раза, так что 20 MiB превращаются примерно в 28.7 МБ из лимита релея
+    /// в 30 000 000 байт на письмо.
     /// </summary>
     [Range(1L, MultipartRequestBytes)]
     public long MaxTotalBytes { get; set; } = 20 * 1024 * 1024;
@@ -40,9 +41,9 @@ public sealed class AttachmentOptions
     public long MaxFileBytes { get; set; } = 20 * 1024 * 1024;
 
     /// <summary>
-    /// Extensions a file name may end with. Null means <see cref="DefaultAllowedExtensions"/>;
-    /// a configured list replaces the defaults rather than extending them. (A pre-filled list
-    /// would be appended to by the configuration binder, hence null instead.)
+    /// Допустимые расширения имени файла. Null означает <see cref="DefaultAllowedExtensions"/>;
+    /// заданный в конфигурации список заменяет значения по умолчанию, а не дополняет их.
+    /// (В заранее заполненный список привязчик конфигурации дописывал бы элементы, поэтому null.)
     /// </summary>
     public IReadOnlyList<string>? AllowedExtensions { get; set; }
 

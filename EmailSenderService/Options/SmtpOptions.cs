@@ -4,9 +4,9 @@ using MailKit.Security;
 namespace EmailSenderService.Options;
 
 /// <summary>
-/// SMTP transport settings. Host/port/security normally come from appsettings or the Helm
-/// ConfigMap; <see cref="UserName"/> and <see cref="Password"/> are expected to arrive as
-/// environment variables projected from a Kubernetes Secret, never from a ConfigMap.
+/// Настройки SMTP-транспорта. Host/port/security обычно приходят из appsettings или Helm
+/// ConfigMap; <see cref="UserName"/> и <see cref="Password"/> должны приходить как переменные
+/// окружения из Kubernetes Secret и никогда - из ConfigMap.
 /// </summary>
 public sealed class SmtpOptions
 {
@@ -24,7 +24,7 @@ public sealed class SmtpOptions
 
     public string? Password { get; set; }
 
-    /// <summary>Envelope sender. Clients cannot override this - that is the point of the service.</summary>
+    /// <summary>Адрес отправителя. Клиенты не могут его переопределить - в этом и смысл сервиса.</summary>
     [Required(AllowEmptyStrings = false)]
     [EmailAddress]
     public string FromAddress { get; set; } = string.Empty;
@@ -35,13 +35,13 @@ public sealed class SmtpOptions
     public int TimeoutSeconds { get; set; } = 30;
 
     /// <summary>
-    /// Largest message the relay accepts, measured as it goes on the wire. The built message is
-    /// checked against this before connecting, so an oversized one is a 413 from this API rather
-    /// than a 502 from the relay. Keep it in step with the relay's SIZE limit.
+    /// Максимальный размер письма, принимаемый релеем, в том виде, в каком оно уходит в сеть.
+    /// Собранное письмо сверяется с ним до подключения, поэтому слишком большое письмо даёт 413
+    /// от этого API, а не 502 от релея. Держите значение в соответствии с лимитом SIZE релея.
     /// </summary>
     [Range(1L, long.MaxValue)]
     public long MaxMessageBytes { get; set; } = 30_000_000;
 
-    /// <summary>Accept untrusted server certificates. Intended for test relays only.</summary>
+    /// <summary>Принимать недоверенные сертификаты сервера. Только для тестовых релеев.</summary>
     public bool AcceptInvalidCertificates { get; set; }
 }

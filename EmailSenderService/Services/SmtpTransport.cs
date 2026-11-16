@@ -7,9 +7,9 @@ using MimeKit;
 namespace EmailSenderService.Services;
 
 /// <summary>
-/// Sends through MailKit. A fresh <see cref="SmtpClient"/> is created per message on purpose:
-/// MailKit's client is not thread-safe, so a shared instance would have to be locked, which
-/// would serialise every request against a single connection.
+/// Отправляет через MailKit. Новый <see cref="SmtpClient"/> на каждое письмо создаётся намеренно:
+/// клиент MailKit не потокобезопасен, так что общий экземпляр пришлось бы блокировать, и все
+/// запросы выстроились бы в очередь к одному соединению.
 /// </summary>
 public sealed class SmtpTransport(ILogger<SmtpTransport> logger) : ISmtpTransport
 {
@@ -31,7 +31,7 @@ public sealed class SmtpTransport(ILogger<SmtpTransport> logger) : ISmtpTranspor
 
             if (!string.IsNullOrWhiteSpace(options.UserName))
             {
-                // Some relays advertise XOAUTH2 and then fail the handshake for password auth.
+                // Некоторые релеи объявляют XOAUTH2, а затем проваливают рукопожатие при входе по паролю.
                 client.AuthenticationMechanisms.Remove("XOAUTH2");
                 await client.AuthenticateAsync(options.UserName, options.Password ?? string.Empty, cancellationToken);
             }

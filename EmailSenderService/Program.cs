@@ -14,22 +14,23 @@ var builder = WebApplication.CreateBuilder(args);
 
 if (!builder.Environment.IsDevelopment())
 {
-    // One JSON object per line is what cluster log collectors expect.
+    // Сборщики логов в кластере ожидают один JSON-объект на строку.
     builder.Logging.AddJsonConsole();
 }
 
-// Cap for the JSON action, whose body text arrives inline. The relay takes at most
-// Smtp:MaxMessageBytes (30 MB) and encoding only grows text, so a larger JSON body could never
-// be sent - accepting it would just buffer several copies of a request bound to fail. The
-// multipart action sets its own, lower cap (AttachmentOptions.MultipartRequestBytes).
+// Ограничение для JSON-действия, в котором текст письма приходит прямо в теле запроса. Релей
+// принимает не больше Smtp:MaxMessageBytes (30 МБ), а кодирование текст только увеличивает,
+// поэтому JSON большего размера отправить всё равно не получится - приняв его, мы лишь
+// буферизовали бы несколько копий обречённого запроса. У multipart-действия своё, более
+// низкое ограничение (AttachmentOptions.MultipartRequestBytes).
 var maxBodyMegabytes = builder.Configuration.GetValue("RequestLimits:MaxBodyMegabytes", 30L);
 builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = maxBodyMegabytes * 1024 * 1024);
 
 var keycloakOptions = builder.Configuration.GetSection(KeycloakOptions.SectionName).Get<KeycloakOptions>()
                       ?? new KeycloakOptions();
 
-// Smtp:UserName and Smtp:Password are expected to arrive as environment variables projected
-// from a Kubernetes Secret, so they never sit in appsettings or the ConfigMap.
+// Smtp:UserName и Smtp:Password должны приходить как переменные окружения из Kubernetes
+// Secret, поэтому их никогда нет ни в appsettings, ни в ConfigMap.
 builder.Services.AddOptions<SmtpOptions>()
     .Bind(builder.Configuration.GetSection(SmtpOptions.SectionName))
     .ValidateDataAnnotations()
@@ -53,8 +54,8 @@ builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 builder.Services.AddSingleton<ISmtpTransport, SmtpTransport>();
 builder.Services.AddSingleton<AttachmentValidator>();
 
-// Behind an ingress the original scheme and client address arrive in X-Forwarded-*; without
-// this every request is logged as plain http from the ingress controller's own IP.
+// За ingress исходная схема и адрес клиента приходят в X-Forwarded-*; без этой настройки каждый
+// запрос попадает в лог как обычный http с IP самого ingress-контроллера.
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
@@ -62,8 +63,9 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     options.KnownProxies.Clear();
 });
 
-// Bearer tokens only. Callers are other services holding a Keycloak client-credentials token;
-// there is no interactive sign-in, so no OIDC handler, cookies, or redirect URIs are involved.
+// Только bearer-токены. Вызывающие стороны - другие сервисы с токеном Keycloak, полученным
+// по client credentials; интерактивного входа нет, поэтому нет ни OIDC-обработчика, ни cookie,
+// ни redirect URI.
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -78,8 +80,8 @@ builder.Services
             ValidateAudience = keycloakOptions.ValidateAudience,
             ValidAudience = keycloakOptions.Audience,
             ValidateLifetime = true,
-            // A service account token names the calling client in `azp`; that, not a person's
-            // username, is the identity worth carrying into the logs.
+            // Токен сервисного аккаунта называет вызывающий клиент в `azp`; именно его, а не имя
+            // пользователя, имеет смысл писать в логи как идентификатор вызывающего.
             NameClaimType = "azp",
             RoleClaimType = ClaimTypes.Role
         };
@@ -136,8 +138,8 @@ builder.Services.AddSwaggerGen(options =>
         [new OpenApiSecuritySchemeReference("bearer", document)] = []
     });
 
-    // POST api/email/send has a JSON and a multipart action; document them as one operation
-    // with two request body media types.
+    // У POST api/email/send есть JSON- и multipart-действие; документируем их как одну операцию
+    // с двумя media type тела запроса.
     options.ResolveConflictingActions(ContentTypeVariantsOperationFilter.Resolve);
     options.OperationFilter<ContentTypeVariantsOperationFilter>();
 
@@ -164,7 +166,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// Liveness answers "is the process up"; readiness additionally requires usable SMTP configuration.
+// Liveness отвечает на вопрос «жив ли процесс»; readiness дополнительно требует пригодной SMTP-конфигурации.
 app.MapHealthChecks("/healthz/live", new HealthCheckOptions { Predicate = _ => false })
     .AllowAnonymous();
 app.MapHealthChecks("/healthz/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") })

@@ -3,18 +3,18 @@ using System.ComponentModel.DataAnnotations;
 namespace EmailSenderService.Models;
 
 /// <summary>
-/// A message to deliver. The sender address is fixed by server configuration and is
-/// deliberately not part of this contract. <see cref="SendEmailFormRequest"/> extends it for the
-/// multipart action, so both paths share the same fields and validation.
+/// Письмо для доставки. Адрес отправителя задаётся конфигурацией сервера и намеренно не входит
+/// в этот контракт. <see cref="SendEmailFormRequest"/> расширяет его для multipart-действия,
+/// так что у обоих путей одни и те же поля и валидация.
 /// </summary>
 public class SendEmailRequest
 {
-    /// <summary>Primary recipients. At least one is required.</summary>
+    /// <summary>Основные получатели. Нужен хотя бы один.</summary>
     [Required]
     [MinLength(1, ErrorMessage = "At least one recipient is required.")]
     [EmailAddressList]
-    // A mutable list, not []: form binding copies into an existing collection and silently
-    // skips a read-only one such as the empty array [] produces, leaving To empty.
+    // Изменяемый список, а не []: привязка формы копирует в существующую коллекцию и молча
+    // пропускает коллекцию только для чтения (как пустой массив от []), оставляя To пустым.
     public IReadOnlyList<string> To { get; init; } = new List<string>();
 
     [EmailAddressList]
@@ -23,7 +23,7 @@ public class SendEmailRequest
     [EmailAddressList]
     public IReadOnlyList<string>? Bcc { get; init; }
 
-    /// <summary>Address replies are directed to. Optional.</summary>
+    /// <summary>Адрес для ответов. Необязательный.</summary>
     [EmailAddress]
     public string? ReplyTo { get; init; }
 
@@ -34,6 +34,6 @@ public class SendEmailRequest
     [Required(AllowEmptyStrings = false)]
     public string Body { get; init; } = string.Empty;
 
-    /// <summary>When true the body is sent as text/html, otherwise as text/plain.</summary>
+    /// <summary>Если true, тело отправляется как text/html, иначе как text/plain.</summary>
     public bool IsHtml { get; init; }
 }

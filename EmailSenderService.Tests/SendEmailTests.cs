@@ -53,12 +53,12 @@ public sealed class SendEmailTests : IDisposable
     public async Task Multipart_request_attaches_files_with_rfc2047_names_and_derived_content_types()
     {
         using var client = factory.CreateAuthorizedClient();
-        var pdfBytes = RandomBytes(150_000, seed: 1); // over the 64 KB threshold, so it is buffered to disk
+        var pdfBytes = RandomBytes(150_000, seed: 1); // больше порога 64 КБ, поэтому буферизуется на диск
         var csvBytes = Encoding.UTF8.GetBytes("a;b\n1;2\n");
 
         using var form = Form(("to", "someone@example.com"), ("to", "other@example.com"),
             ("subject", "Квартальный отчёт"), ("body", "<p>См. вложение</p>"), ("isHtml", "true"));
-        // The client claims text/plain; the service must derive application/pdf from the extension.
+        // Клиент заявляет text/plain; сервис должен вывести application/pdf из расширения.
         form.Add(File(pdfBytes, "text/plain"), "attachments", CyrillicFileName);
         form.Add(File(csvBytes, "application/x-whatever"), "attachments", @"C:\Users\someone\data.csv");
 
@@ -78,14 +78,14 @@ public sealed class SendEmailTests : IDisposable
         Assert.Equal("data.csv", attachments[1].FileName);
         Assert.Equal("text/csv", attachments[1].ContentType.MimeType);
 
-        // Outlook needs RFC 2047 encoded-words, not RFC 2231 (filename*=utf-8''...).
+        // Outlook нужны encoded-words RFC 2047, а не RFC 2231 (filename*=utf-8''...).
         var headers = Encoding.ASCII.GetString(wire);
         Assert.Contains("filename=\"=?utf-8?b?", headers, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("name=\"=?utf-8?b?", headers, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("filename*", headers, StringComparison.Ordinal);
         Assert.DoesNotContain("name*", headers, StringComparison.Ordinal);
 
-        // Parse the wire bytes back: the content survived being read once for the size check.
+        // Разбираем байты обратно: содержимое пережило первое чтение при проверке размера.
         var reparsed = MimeMessage.Load(new MemoryStream(wire), TestContext.Current.CancellationToken);
         var reparsedParts = reparsed.Attachments.Cast<MimePart>().ToList();
         Assert.Equal(CyrillicFileName, reparsedParts[0].FileName);
@@ -172,7 +172,7 @@ public sealed class SendEmailTests : IDisposable
         using var smallRelay = EmailApiFactory.WithOptions(smtp: options => options.MaxMessageBytes = 20_000);
         using var client = smallRelay.CreateAuthorizedClient();
         using var form = Form(("to", "someone@example.com"), ("subject", "s"), ("body", "b"));
-        // 16 KB raw is well under every attachment limit but about 22 KB once base64-encoded.
+        // 16 КБ исходных данных - намного меньше любого лимита вложений, но около 22 КБ в base64.
         form.Add(File(RandomBytes(16_000, seed: 2), "application/pdf"), "attachments", "scan.pdf");
 
         var response = await client.PostAsync(SendPath, form, TestContext.Current.CancellationToken);
@@ -268,8 +268,8 @@ public sealed class SendEmailTests : IDisposable
     private static async Task<JsonElement> AssertValidationProblem(HttpResponseMessage response)
     {
         await AssertStatus(response, HttpStatusCode.BadRequest);
-        // The controller's [Produces("application/json")] also applies to its validation
-        // problems; the body is still a ValidationProblemDetails.
+        // [Produces("application/json")] контроллера действует и на ошибки валидации;
+        // тело при этом всё равно ValidationProblemDetails.
         var problem = await response.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
         Assert.Equal(400, problem.GetProperty("status").GetInt32());
         return problem.GetProperty("errors");

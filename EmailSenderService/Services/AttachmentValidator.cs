@@ -6,13 +6,14 @@ using Microsoft.Extensions.Options;
 
 namespace EmailSenderService.Services;
 
-/// <summary>An uploaded file that passed validation, with the name and content type this service decided on.</summary>
+/// <summary>Загруженный файл, прошедший валидацию, с именем и типом содержимого, определёнными этим сервисом.</summary>
 public sealed record ValidatedAttachment(IFormFile File, string FileName, string ContentType);
 
 /// <summary>
-/// Applies <see cref="AttachmentOptions"/> to uploaded files. Nothing about a file is taken on
-/// trust: the name is reduced to a bare, printable file name and the content type is derived
-/// from its extension, because both end up in headers that recipients' mail clients act on.
+/// Применяет <see cref="AttachmentOptions"/> к загруженным файлам. Ничему в файле не верим на
+/// слово: имя сводится к голому печатаемому имени файла, а тип содержимого выводится из
+/// расширения, потому что и то и другое попадает в заголовки, по которым действуют почтовые
+/// клиенты получателей.
 /// </summary>
 public sealed class AttachmentValidator(IOptionsMonitor<AttachmentOptions> optionsMonitor)
 {
@@ -20,7 +21,7 @@ public sealed class AttachmentValidator(IOptionsMonitor<AttachmentOptions> optio
 
     private static readonly FileExtensionContentTypeProvider ContentTypes = new();
 
-    /// <summary>Validates <paramref name="files"/>; on failure <paramref name="errors"/> holds one message per problem, keyed by field.</summary>
+    /// <summary>Проверяет <paramref name="files"/>; при ошибке <paramref name="errors"/> содержит по сообщению на каждую проблему с ключом по полю.</summary>
     public bool TryValidate(
         IReadOnlyList<IFormFile>? files,
         out IReadOnlyList<ValidatedAttachment> attachments,
@@ -92,8 +93,8 @@ public sealed class AttachmentValidator(IOptionsMonitor<AttachmentOptions> optio
     }
 
     /// <summary>
-    /// Reduces a client-supplied name to its last path segment with control characters removed
-    /// and the length capped (keeping the extension). Returns null when nothing usable is left.
+    /// Сводит переданное клиентом имя к последнему сегменту пути, удаляя управляющие символы и
+    /// ограничивая длину (с сохранением расширения). Возвращает null, если ничего пригодного не осталось.
     /// </summary>
     public static string? SanitizeFileName(string? rawName)
     {
@@ -102,7 +103,7 @@ public sealed class AttachmentValidator(IOptionsMonitor<AttachmentOptions> optio
             return null;
         }
 
-        // Path.GetFileName only splits on '/' on Linux, and Windows clients send "C:\dir\file".
+        // На Linux Path.GetFileName делит путь только по '/', а Windows-клиенты присылают "C:\dir\file".
         var name = Path.GetFileName(rawName.Replace('\\', '/'));
         name = new string(name.Where(c => !char.IsControl(c)).ToArray()).Trim();
 

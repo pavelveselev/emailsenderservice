@@ -4,9 +4,9 @@ using Microsoft.AspNetCore.Mvc;
 namespace EmailSenderService.Services;
 
 /// <summary>
-/// Turns a relay failure into 502 with a ProblemDetails body. The caller did nothing wrong,
-/// so this must not surface as a 500, and the relay's own message is passed through because
-/// it usually names the rejected mailbox.
+/// Превращает сбой релея в 502 с телом ProblemDetails. Вызывающий ни в чём не виноват, поэтому
+/// это не должно выглядеть как 500, а сообщение самого релея передаётся дальше, потому что
+/// обычно в нём назван отклонённый ящик.
 /// </summary>
 public sealed class EmailDeliveryExceptionHandler(IProblemDetailsService problemDetailsService) : IExceptionHandler
 {

@@ -1,7 +1,7 @@
 {{/*
-Non-secret configuration only. ASP.NET Core reads __ as the section separator, so
-Smtp__Host lands in the same place as "Smtp": { "Host": ... } in appsettings.json,
-overriding it. The SMTP password is never here - it comes from a Secret as an env var.
+Только несекретная конфигурация. ASP.NET Core считает __ разделителем секций, поэтому
+Smtp__Host попадает туда же, куда "Smtp": { "Host": ... } в appsettings.json, и
+переопределяет его. SMTP-пароля здесь нет никогда - он приходит из Secret переменной окружения.
 */}}
 apiVersion: v1
 kind: ConfigMap

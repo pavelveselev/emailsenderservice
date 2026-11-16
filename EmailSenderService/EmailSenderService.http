@@ -1,7 +1,7 @@
 @host = http://localhost:5158
 
-# Obtain a token from Keycloak. For a confidential client use client_credentials as below;
-# for a user-facing client use the Swagger UI Authorize button instead.
+# Получение токена в Keycloak. Для конфиденциального клиента используйте client_credentials, как ниже;
+# для пользовательского клиента - кнопку Authorize в Swagger UI.
 # @name token
 POST http://localhost:8080/realms/master/protocol/openid-connect/token
 Content-Type: application/x-www-form-urlencoded
@@ -12,7 +12,7 @@ grant_type=client_credentials&client_id=email-sender&client_secret=REPLACE_ME
 
 @accessToken = {{token.response.body.access_token}}
 
-### Plain text
+### Обычный текст
 POST {{host}}/api/email/send
 Content-Type: application/json
 Authorization: Bearer {{accessToken}}
@@ -24,7 +24,7 @@ Authorization: Bearer {{accessToken}}
   "isHtml": false
 }
 
-### HTML with cc and reply-to
+### HTML с cc и reply-to
 POST {{host}}/api/email/send
 Content-Type: application/json
 Authorization: Bearer {{accessToken}}
@@ -38,7 +38,7 @@ Authorization: Bearer {{accessToken}}
   "isHtml": true
 }
 
-### With attachments: same fields as multipart/form-data, lists as repeated keys
+### С вложениями: те же поля в виде multipart/form-data, списки - повторяющимися ключами
 POST {{host}}/api/email/send
 Authorization: Bearer {{accessToken}}
 Content-Type: multipart/form-data; boundary=boundary
@@ -66,5 +66,5 @@ Content-Type: text/plain
 Revenue up, costs down.
 --boundary--
 
-### Readiness (anonymous)
+### Readiness (анонимно)
 GET {{host}}/healthz/ready

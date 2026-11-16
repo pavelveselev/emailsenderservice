@@ -2,7 +2,7 @@ replicaCount: 2
 
 image:
   repository: email-sender
-  # Defaults to the chart's appVersion when empty.
+  # Если пусто, берётся appVersion чарта.
   tag: ""
   pullPolicy: IfNotPresent
 
@@ -11,13 +11,13 @@ nameOverride: ""
 fullnameOverride: ""
 
 serviceAccount:
-  # Give the pod its own identity, so whatever supplies the SMTP credentials
-  # (a Vault role binding, an external-secrets store) can be scoped to this workload.
+  # Отдельная идентичность для пода, чтобы источник SMTP-учётных данных
+  # (привязка роли Vault, хранилище external-secrets) можно было ограничить этой нагрузкой.
   create: true
   name: ""
   annotations: {}
 
-# Vault Agent / Vault Secrets Operator injector annotations go here.
+# Сюда - аннотации инжектора Vault Agent / Vault Secrets Operator.
 podAnnotations: {}
 podLabels: {}
 
@@ -28,10 +28,10 @@ service:
 ingress:
   enabled: false
   className: ""
-  # Rendered as nginx.ingress.kubernetes.io/proxy-body-size (ingress-nginx defaults to 1m,
-  # which would turn most attachments into a 413 from nginx). Empty derives it from
-  # requestLimits.maxBodyMegabytes, the largest body the API itself accepts; an annotation
-  # with the same key under `annotations` takes precedence.
+  # Выводится как nginx.ingress.kubernetes.io/proxy-body-size (по умолчанию в ingress-nginx
+  # это 1m, и большинство вложений получили бы 413 от nginx). Пустое значение берётся из
+  # requestLimits.maxBodyMegabytes - самого большого тела, которое принимает сам API;
+  # аннотация с тем же ключом в `annotations` имеет приоритет.
   proxyBodySize: ""
   annotations: {}
   hosts:
@@ -41,12 +41,13 @@ ingress:
           pathType: Prefix
   tls: []
 
-# Memory: a JSON request is held in memory several times over while it is turned into a
-# MIME message (JSON buffer, UTF-16 string, encoded body), so budget roughly 6x
-# requestLimits.maxBodyMegabytes per concurrent large JSON send: 30 MiB x 6 = ~180 MiB.
-# Multipart uploads cost little memory - files over 64 KB are buffered to /tmp and streamed
-# from there through the size check and onto the wire. 512Mi covers a ~100 MiB runtime
-# baseline plus two worst-case JSON sends at once; raise it with maxBodyMegabytes.
+# Память: пока JSON-запрос превращается в MIME-письмо, он хранится в памяти в нескольких
+# копиях (буфер JSON, строка UTF-16, закодированное тело), так что закладывайте примерно
+# 6x requestLimits.maxBodyMegabytes на каждую одновременную большую JSON-отправку:
+# 30 MiB x 6 = ~180 MiB. Multipart-загрузки памяти почти не стоят - файлы больше 64 КБ
+# буферизуются в /tmp и оттуда потоком проходят проверку размера и уходят в сеть. 512Mi
+# покрывают базовые ~100 MiB рантайма плюс две худшие JSON-отправки одновременно;
+# увеличивайте вместе с maxBodyMegabytes.
 resources:
   requests:
     cpu: 50m
@@ -55,29 +56,31 @@ resources:
     memory: 512Mi
 
 requestLimits:
-  # Largest JSON request body the API accepts. The relay takes at most smtp.maxMessageBytes
-  # and encoding only grows text, so a larger body could never be sent. The multipart action
-  # has its own fixed 25 MiB cap. An ingress body limit applies separately (ingress.proxyBodySize).
+  # Максимальный размер тела JSON-запроса, принимаемый API. Релей принимает не больше
+  # smtp.maxMessageBytes, а кодирование текст только увеличивает, так что большее тело
+  # отправить всё равно нельзя. У multipart-действия свой фиксированный лимит 25 MiB.
+  # Лимит тела на ingress задаётся отдельно (ingress.proxyBodySize).
   maxBodyMegabytes: 30
 
-# /tmp is an emptyDir (the root filesystem is read-only). ASP.NET Core buffers every uploaded
-# file over 64 KB there for the life of the request, up to 25 MiB per multipart request, so
-# 256Mi holds about ten maximum-size uploads in flight. Exceeding sizeLimit gets the pod
-# evicted rather than failing one write, hence the headroom; scale it with concurrency.
+# /tmp - это emptyDir (корневая ФС только для чтения). ASP.NET Core буферизует туда каждый
+# загруженный файл больше 64 КБ на время запроса, до 25 MiB на multipart-запрос, так что
+# 256Mi вмещают около десяти одновременных загрузок максимального размера. Превышение
+# sizeLimit приводит к вытеснению пода, а не к ошибке одной записи, отсюда и запас;
+# масштабируйте вместе с конкурентностью.
 tmpVolume:
   sizeLimit: 256Mi
 
-# Per-message file limits, enforced with a 400 before anything is built. Raw bytes grow by
-# ~1.37x as base64, so the 20 MiB total becomes ~28.7 MB of a 30,000,000-byte message.
+# Лимиты на файлы в одном письме; проверяются с ответом 400 до сборки письма. В base64 байты
+# вырастают в ~1.37 раза, так что 20 MiB в сумме дают ~28.7 МБ из 30 000 000 байт письма.
 attachments:
   maxCount: 10
   maxTotalBytes: 20971520
   maxFileBytes: 20971520
-  # Empty keeps the built-in list: .pdf .doc .docx .xls .xlsx .odt .ods .txt .csv .png .jpg
-  # .jpeg .zip. A list here replaces it entirely.
+  # Пустое значение оставляет встроенный список: .pdf .doc .docx .xls .xlsx .odt .ods .txt
+  # .csv .png .jpg .jpeg .zip. Заданный здесь список полностью его заменяет.
   allowedExtensions: []
 
-# Transport settings only - do not put a password here, it would land in the ConfigMap.
+# Только настройки транспорта - не кладите сюда пароль, он попадёт в ConfigMap.
 smtp:
   host: smtp.example.com
   port: 587
@@ -87,37 +90,38 @@ smtp:
   fromDisplayName: Notifications
   timeoutSeconds: 30
   acceptInvalidCertificates: false
-  # The relay's message size limit (its SIZE). Messages are measured fully encoded before
-  # connecting; a larger one is refused with 413 instead of being bounced by the relay as 502.
+  # Лимит размера письма на релее (его SIZE). Письмо измеряется полностью закодированным до
+  # подключения; слишком большое отклоняется с 413, а не возвращается релеем как 502.
   maxMessageBytes: 30000000
-  # Set only when the credentials Secret carries no user name key.
+  # Задавайте, только если в Secret с учётными данными нет ключа имени пользователя.
   userName: ""
-  # Credentials are read from an existing Secret that this chart never creates - fill it
-  # however you already manage secrets (Vault Agent injector, Vault Secrets Operator,
-  # external-secrets). Leave name empty for a relay that needs no authentication.
+  # Учётные данные читаются из существующего Secret, который этот чарт никогда не создаёт, -
+  # заполняйте его тем способом, каким уже управляете секретами (инжектор Vault Agent,
+  # Vault Secrets Operator, external-secrets). Оставьте name пустым, если релею не нужна
+  # аутентификация.
   credentialsSecret:
     name: ""
-    # Keys within that Secret. Leave userNameKey empty to keep smtp.userName above.
+    # Ключи внутри этого Secret. Оставьте userNameKey пустым, чтобы использовать smtp.userName выше.
     userNameKey: username
     passwordKey: password
 
-# Callers are other services presenting a Keycloak client-credentials token; this service
-# only validates it, so no client secret or redirect URI is needed here.
+# Вызывающие стороны - другие сервисы с токеном Keycloak, полученным по client credentials;
+# этот сервис только проверяет его, поэтому ни client secret, ни redirect URI здесь не нужны.
 keycloak:
   authority: https://keycloak.example.com/realms/corp
   audience: email-sender
-  # Keycloak omits the client from `aud` unless the calling client has an audience mapper.
-  # Add that mapper, or set this to false.
+  # Keycloak не включает клиента в `aud`, если у вызывающего клиента нет audience mapper.
+  # Добавьте этот mapper или установите здесь false.
   validateAudience: true
   requireHttpsMetadata: true
-  # Realm role (or client role, when rolesClientId is set) the calling service account must hold.
+  # Роль realm (или роль клиента, если задан rolesClientId), которая должна быть у сервисного аккаунта вызывающего.
   requiredRole: email-sender
   rolesClientId: email-sender
 
 swagger:
   enabled: true
 
-# Extra environment variables, e.g. Logging__LogLevel__Default.
+# Дополнительные переменные окружения, например Logging__LogLevel__Default.
 extraEnv: []
 
 podSecurityContext:

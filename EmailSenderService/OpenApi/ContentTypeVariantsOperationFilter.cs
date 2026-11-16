@@ -7,10 +7,10 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 namespace EmailSenderService.OpenApi;
 
 /// <summary>
-/// OpenAPI allows one operation per path and verb, while the send endpoint has two actions told
-/// apart by <c>[Consumes]</c>. <see cref="Resolve"/> keeps the JSON action as the operation and
-/// remembers the others; the filter then adds each one's form fields as another request body
-/// media type, so the multipart variant shows up with its file field in the same operation.
+/// OpenAPI допускает одну операцию на путь и метод, а у эндпоинта отправки два действия,
+/// различаемых по <c>[Consumes]</c>. <see cref="Resolve"/> оставляет операцией JSON-действие и
+/// запоминает остальные; затем фильтр добавляет поля формы каждого из них как ещё один media type
+/// тела запроса, так что multipart-вариант с файловым полем виден в той же операции.
 /// </summary>
 public sealed class ContentTypeVariantsOperationFilter : IOperationFilter
 {
@@ -57,7 +57,7 @@ public sealed class ContentTypeVariantsOperationFilter : IOperationFilter
                 schema.Properties[field.Name] = context.SchemaGenerator.GenerateSchema(
                     field.Type, context.SchemaRepository, field.PropertyInfo(), field.ParameterInfo());
 
-                // ApiExplorer does not flag [Required] form properties, so read the attribute.
+                // ApiExplorer не помечает [Required]-свойства формы, поэтому читаем атрибут сами.
                 if (field.IsRequired || field.PropertyInfo()?.IsDefined(typeof(RequiredAttribute), inherit: true) == true)
                 {
                     schema.Required.Add(field.Name);

@@ -16,17 +16,17 @@ public sealed class EmailController(
     AttachmentValidator attachmentValidator,
     ILogger<EmailController> logger) : ControllerBase
 {
-    /// <summary>Sends one message through the configured relay.</summary>
+    /// <summary>Отправляет одно письмо через настроенный релей.</summary>
     /// <remarks>
-    /// Send JSON for a plain message, or multipart/form-data with the same fields (lists as
-    /// repeated keys) plus an <c>Attachments</c> file field for one with attachments.
+    /// Для обычного письма отправьте JSON; для письма с вложениями - multipart/form-data с теми
+    /// же полями (списки - повторяющимися ключами) и файловым полем <c>Attachments</c>.
     /// </remarks>
-    /// <response code="200">The relay accepted the message.</response>
-    /// <response code="400">The request failed validation.</response>
-    /// <response code="401">No or invalid Keycloak token.</response>
-    /// <response code="403">Token is valid but lacks the required role.</response>
-    /// <response code="413">The request body, or the message built from it, exceeds the size limit.</response>
-    /// <response code="502">The relay rejected the message or was unreachable.</response>
+    /// <response code="200">Релей принял письмо.</response>
+    /// <response code="400">Запрос не прошёл валидацию.</response>
+    /// <response code="401">Токен Keycloak отсутствует или недействителен.</response>
+    /// <response code="403">Токен действителен, но у него нет нужной роли.</response>
+    /// <response code="413">Тело запроса или собранное из него письмо превышает допустимый размер.</response>
+    /// <response code="502">Релей отклонил письмо или был недоступен.</response>
     [HttpPost("send")]
     [Consumes("application/json")]
     [ProducesResponseType(typeof(SendEmailResponse), StatusCodes.Status200OK)]
@@ -40,13 +40,13 @@ public sealed class EmailController(
         CancellationToken cancellationToken) =>
         SendAsync(request, [], cancellationToken);
 
-    /// <summary>Sends one message with file attachments (multipart/form-data, same fields as the JSON form).</summary>
-    /// <response code="200">The relay accepted the message.</response>
-    /// <response code="400">The request or an attachment failed validation.</response>
-    /// <response code="401">No or invalid Keycloak token.</response>
-    /// <response code="403">Token is valid but lacks the required role.</response>
-    /// <response code="413">The request body, or the message built from it, exceeds the size limit.</response>
-    /// <response code="502">The relay rejected the message or was unreachable.</response>
+    /// <summary>Отправляет одно письмо с файловыми вложениями (multipart/form-data, те же поля, что и в JSON).</summary>
+    /// <response code="200">Релей принял письмо.</response>
+    /// <response code="400">Запрос или вложение не прошли валидацию.</response>
+    /// <response code="401">Токен Keycloak отсутствует или недействителен.</response>
+    /// <response code="403">Токен действителен, но у него нет нужной роли.</response>
+    /// <response code="413">Тело запроса или собранное из него письмо превышает допустимый размер.</response>
+    /// <response code="502">Релей отклонил письмо или был недоступен.</response>
     [HttpPost("send")]
     [Consumes("multipart/form-data")]
     [RequestSizeLimit(AttachmentOptions.MultipartRequestBytes)]
@@ -77,9 +77,9 @@ public sealed class EmailController(
             return ValidationProblem(ModelState);
         }
 
-        // Each stream reads the buffered upload (memory or a temp file under /tmp) without
-        // copying it. They are closed here, after the send, and the framework deletes the temp
-        // files when the response completes.
+        // Каждый поток читает буферизованную загрузку (из памяти или временного файла в /tmp)
+        // без копирования. Потоки закрываются здесь, после отправки, а временные файлы
+        // фреймворк удаляет по завершении ответа.
         var attachments = validated
             .Select(file => new EmailAttachment(file.FileName, file.ContentType, file.File.OpenReadStream()))
             .ToList();
@@ -97,13 +97,13 @@ public sealed class EmailController(
         }
     }
 
-    /// <summary>The one path both actions take to the sender, so they cannot drift apart.</summary>
+    /// <summary>Единый путь к отправителю для обоих действий, чтобы они не могли разойтись.</summary>
     private async Task<ActionResult<SendEmailResponse>> SendAsync(
         SendEmailRequest request,
         IReadOnlyList<EmailAttachment> attachments,
         CancellationToken cancellationToken)
     {
-        // File names stay out of the log: they routinely carry personal data.
+        // Имена файлов в лог не пишем: в них часто бывают персональные данные.
         logger.LogInformation(
             "Send request from {Caller} for {RecipientCount} recipient(s) with {AttachmentCount} attachment(s), {AttachmentBytes} bytes",
             User.Identity?.Name ?? "unknown", request.To.Count, attachments.Count,

@@ -12,8 +12,8 @@ spec:
   template:
     metadata:
       annotations:
-        # Roll the pods when configuration changes; without this a helm upgrade that only
-        # touches the ConfigMap leaves the old values live in the running containers.
+        # Перезапускать поды при изменении конфигурации; без этого helm upgrade, меняющий только
+        # ConfigMap, оставляет в работающих контейнерах старые значения.
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
@@ -29,7 +29,7 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "email-sender.serviceAccountName" . }}
-      # Left mounted so an in-cluster secrets injector can authenticate as this workload.
+      # Оставлен смонтированным, чтобы внутрикластерный инжектор секретов мог аутентифицироваться от имени этой нагрузки.
       automountServiceAccountToken: true
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
@@ -47,8 +47,8 @@ spec:
             - configMapRef:
                 name: {{ include "email-sender.fullname" . }}
           env:
-            # Credentials as env vars from a Secret the chart does not own; an `env` entry
-            # outranks the same key coming from `envFrom`, so this wins over the ConfigMap.
+            # Учётные данные - переменными окружения из Secret, которым чарт не владеет; запись в
+            # `env` важнее того же ключа из `envFrom`, поэтому она побеждает ConfigMap.
             {{- with .Values.smtp.credentialsSecret }}
             {{- if .name }}
             {{- with .userNameKey }}
@@ -74,9 +74,9 @@ spec:
               port: http
             periodSeconds: 10
           readinessProbe:
-            # Reports unhealthy while required configuration or the credential Secret is
-            # missing, which keeps a misconfigured pod out of the Service rather than
-            # failing sends.
+            # Сообщает unhealthy, пока нет обязательной конфигурации или Secret с учётными
+            # данными, - так неверно настроенный под остаётся вне Service, а не проваливает
+            # отправки.
             httpGet:
               path: /healthz/ready
               port: http
@@ -91,8 +91,8 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
-            # readOnlyRootFilesystem is on, and the framework still needs somewhere to write -
-            # including uploaded attachments, which are buffered here for the request.
+            # readOnlyRootFilesystem включён, а фреймворку всё равно нужно куда-то писать -
+            # в том числе загруженные вложения, которые буферизуются здесь на время запроса.
             - name: tmp
               mountPath: /tmp
       volumes:

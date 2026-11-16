@@ -5,9 +5,9 @@ using Microsoft.Extensions.Options;
 namespace EmailSenderService.Health;
 
 /// <summary>
-/// Readiness gate. Deliberately does not open an SMTP connection - probes run every few seconds
-/// and a relay would treat that as abuse. It answers the question the pod actually needs answered:
-/// did the full configuration arrive, or are we running on an incomplete overlay?
+/// Проверка готовности. Намеренно не открывает SMTP-соединение - пробы идут каждые несколько
+/// секунд, и релей счёл бы это злоупотреблением. Она отвечает на вопрос, действительно важный
+/// для пода: пришла ли конфигурация целиком или мы работаем на неполном наборе настроек?
 /// </summary>
 public sealed class SmtpConfigurationHealthCheck(IOptionsMonitor<SmtpOptions> optionsMonitor) : IHealthCheck
 {
@@ -26,8 +26,8 @@ public sealed class SmtpConfigurationHealthCheck(IOptionsMonitor<SmtpOptions> op
             missing.Add($"{SmtpOptions.SectionName}:{nameof(SmtpOptions.FromAddress)}");
         }
 
-        // A user name with no password almost always means the credential Secret was not
-        // projected into the pod; better to stay out of the Service than to fail every send.
+        // Имя пользователя без пароля почти всегда значит, что Secret с учётными данными не попал
+        // в под; лучше остаться вне Service, чем проваливать каждую отправку.
         if (!string.IsNullOrWhiteSpace(smtp.UserName) && string.IsNullOrWhiteSpace(smtp.Password))
         {
             missing.Add($"{SmtpOptions.SectionName}:{nameof(SmtpOptions.Password)} (expected from the credential Secret)");

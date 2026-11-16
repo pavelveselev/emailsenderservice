@@ -4,9 +4,10 @@ using Microsoft.AspNetCore.Mvc;
 namespace EmailSenderService.Services;
 
 /// <summary>
-/// Renders oversized input as 413 with a ProblemDetails body: a request body over Kestrel's cap,
-/// or a built message over the relay's size limit. Either way the caller has to send less, so
-/// this must not surface as a 500 (the default for these exceptions) or a 502 (the relay is fine).
+/// Отдаёт слишком большие входные данные как 413 с телом ProblemDetails: тело запроса сверх
+/// лимита Kestrel или собранное письмо сверх лимита релея. В обоих случаях вызывающему нужно
+/// отправить меньше, поэтому это не должно выглядеть как 500 (по умолчанию для этих исключений)
+/// или 502 (с релеем всё в порядке).
 /// </summary>
 public sealed class PayloadTooLargeExceptionHandler(IProblemDetailsService problemDetailsService) : IExceptionHandler
 {

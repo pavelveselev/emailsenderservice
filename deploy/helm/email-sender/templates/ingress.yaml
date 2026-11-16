@@ -5,7 +5,7 @@ metadata:
   name: {{ include "email-sender.fullname" . }}
   labels:
     {{- include "email-sender.labels" . | nindent 4 }}
-  {{- /* The body limit must admit what the API accepts; ingress-nginx defaults to 1m. */}}
+  {{- /* Лимит тела должен пропускать всё, что принимает API; в ingress-nginx по умолчанию 1m. */}}
   {{- $bodySize := .Values.ingress.proxyBodySize | default (printf "%dm" (int .Values.requestLimits.maxBodyMegabytes)) }}
   {{- $annotations := merge (deepCopy (.Values.ingress.annotations | default dict)) (dict "nginx.ingress.kubernetes.io/proxy-body-size" $bodySize) }}
   annotations:

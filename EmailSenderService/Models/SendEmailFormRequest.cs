@@ -1,11 +1,11 @@
 namespace EmailSenderService.Models;
 
 /// <summary>
-/// The multipart/form-data form of <see cref="SendEmailRequest"/>: the same fields (lists as
-/// repeated keys, e.g. <c>to=a@x</c> twice) with the same validation, plus files.
+/// Вариант <see cref="SendEmailRequest"/> для multipart/form-data: те же поля (списки -
+/// повторяющимися ключами, например <c>to=a@x</c> дважды) с той же валидацией, плюс файлы.
 /// </summary>
 public sealed class SendEmailFormRequest : SendEmailRequest
 {
-    /// <summary>Zero or more files. The content type is derived from the file extension; the one the client sends is ignored.</summary>
+    /// <summary>Ноль или больше файлов. Тип содержимого определяется по расширению файла; присланный клиентом игнорируется.</summary>
     public IReadOnlyList<IFormFile>? Attachments { get; init; }
 }

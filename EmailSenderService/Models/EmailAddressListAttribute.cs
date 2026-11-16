@@ -5,8 +5,8 @@ using MimeKit;
 namespace EmailSenderService.Models;
 
 /// <summary>
-/// Validates every entry of a string collection with MimeKit's parser rather than a regex,
-/// so what passes validation is exactly what the SMTP layer can later put on the envelope.
+/// Проверяет каждый элемент коллекции строк парсером MimeKit, а не регулярным выражением,
+/// чтобы валидацию проходило ровно то, что SMTP-слой потом сможет поставить в конверт.
 /// </summary>
 [AttributeUsage(AttributeTargets.Property)]
 public sealed class EmailAddressListAttribute : ValidationAttribute
@@ -40,9 +40,9 @@ public sealed class EmailAddressListAttribute : ValidationAttribute
     }
 
     /// <summary>
-    /// MimeKit happily parses a bare local part such as "postmaster" into a valid
-    /// <see cref="MailboxAddress"/>, which the relay would then reject at RCPT TO time.
-    /// Requiring a non-empty domain turns that into a 400 instead of a 502.
+    /// MimeKit охотно разбирает голую локальную часть вроде "postmaster" в валидный
+    /// <see cref="MailboxAddress"/>, который релей затем отклонил бы на RCPT TO.
+    /// Требование непустого домена превращает это в 400 вместо 502.
     /// </summary>
     private static bool IsRoutableAddress(string? value)
     {

@@ -6,10 +6,10 @@ using Microsoft.AspNetCore.Mvc.Infrastructure;
 namespace EmailSenderService.Controllers;
 
 /// <summary>
-/// Reads the multipart form before model binding so a form that breaks a limit becomes a 413
-/// and a malformed one a 400. Left to model binding, both surface as a 500. Runs after the
-/// <c>[RequestSizeLimit]</c> / <c>[RequestFormLimits]</c> filters (order 900) so their limits
-/// are in force; model binding then reuses the form cached on the request.
+/// Читает multipart-форму до привязки модели, чтобы форма, нарушающая лимит, давала 413, а
+/// повреждённая - 400. Если оставить это привязке модели, оба случая превращаются в 500.
+/// Выполняется после фильтров <c>[RequestSizeLimit]</c> / <c>[RequestFormLimits]</c> (order 900),
+/// чтобы их лимиты действовали; затем привязка модели берёт форму, закешированную в запросе.
 /// </summary>
 [AttributeUsage(AttributeTargets.Method)]
 public sealed class MultipartFormReadFilterAttribute : Attribute, IAsyncResourceFilter, IOrderedFilter
@@ -34,8 +34,8 @@ public sealed class MultipartFormReadFilterAttribute : Attribute, IAsyncResource
                 failureStatus = ex.StatusCode;
                 detail = ex.Message;
             }
-            // The form reader reports both broken limits and broken framing as
-            // InvalidDataException; only the message tells them apart.
+            // Читатель формы сообщает и о превышении лимита, и о нарушенной разметке через
+            // InvalidDataException; различить их можно только по тексту сообщения.
             catch (InvalidDataException ex) when (ex.Message.Contains("limit", StringComparison.OrdinalIgnoreCase))
             {
                 failureStatus = StatusCodes.Status413PayloadTooLarge;

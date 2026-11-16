@@ -3,8 +3,8 @@ using System.Globalization;
 namespace EmailSenderService.Services;
 
 /// <summary>
-/// The built message exceeds <c>Smtp:MaxMessageBytes</c>; surfaced as HTTP 413. Raised before
-/// any connection is made: the caller's input is too big, the relay is fine.
+/// Собранное письмо превышает <c>Smtp:MaxMessageBytes</c>; отдаётся как HTTP 413. Выбрасывается
+/// до какого-либо подключения: слишком велики входные данные вызывающего, с релеем всё в порядке.
 /// </summary>
 public sealed class MessageTooLargeException(long messageBytes, long limitBytes)
     : Exception(string.Create(CultureInfo.InvariantCulture,

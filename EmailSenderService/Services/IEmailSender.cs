@@ -4,11 +4,11 @@ namespace EmailSenderService.Services;
 
 public interface IEmailSender
 {
-    /// <param name="request">Recipients, subject and body.</param>
-    /// <param name="attachments">Files to attach, or null for a plain message. The caller owns their streams.</param>
-    /// <param name="cancellationToken">Aborts building or sending.</param>
-    /// <exception cref="MessageTooLargeException">The built message exceeds the relay's size limit; nothing was sent.</exception>
-    /// <exception cref="EmailDeliveryException">The relay rejected the message or was unreachable.</exception>
+    /// <param name="request">Получатели, тема и тело.</param>
+    /// <param name="attachments">Вкладываемые файлы или null для письма без вложений. Их потоками владеет вызывающий.</param>
+    /// <param name="cancellationToken">Прерывает сборку или отправку.</param>
+    /// <exception cref="MessageTooLargeException">Собранное письмо превышает лимит размера релея; ничего не отправлено.</exception>
+    /// <exception cref="EmailDeliveryException">Релей отклонил письмо или был недоступен.</exception>
     Task<SendEmailResponse> SendAsync(
         SendEmailRequest request,
         IReadOnlyList<EmailAttachment>? attachments,

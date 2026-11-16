@@ -4,10 +4,10 @@ using System.Text.Json;
 namespace EmailSenderService.Security;
 
 /// <summary>
-/// Keycloak ships roles inside the nested <c>realm_access</c> and <c>resource_access</c> JSON
-/// claims, which the JWT handler copies across verbatim as strings. Nothing in ASP.NET Core
-/// understands that shape, so <c>[Authorize(Roles = ...)]</c> and <c>RequireRole</c> see no roles
-/// at all until these are flattened into individual <see cref="ClaimTypes.Role"/> claims.
+/// Keycloak передаёт роли во вложенных JSON-claims <c>realm_access</c> и <c>resource_access</c>,
+/// которые JWT-обработчик копирует как есть, строками. ASP.NET Core такую структуру не понимает,
+/// поэтому <c>[Authorize(Roles = ...)]</c> и <c>RequireRole</c> не видят ни одной роли, пока они
+/// не развёрнуты в отдельные claims <see cref="ClaimTypes.Role"/>.
 /// </summary>
 public static class KeycloakRoleClaims
 {
@@ -39,8 +39,8 @@ public static class KeycloakRoleClaims
             : ReadRoleArray(identity.FindFirst(ResourceAccessClaim)?.Value, clientId);
 
     /// <summary>
-    /// Parses <c>{"roles":[...]}</c>, optionally nested one level under <paramref name="path"/>
-    /// as <c>{"client":{"roles":[...]}}</c>.
+    /// Разбирает <c>{"roles":[...]}</c>, при необходимости вложенный на один уровень под
+    /// <paramref name="path"/> как <c>{"client":{"roles":[...]}}</c>.
     /// </summary>
     private static IEnumerable<string> ReadRoleArray(string? json, string? path)
     {
@@ -72,7 +72,7 @@ public static class KeycloakRoleClaims
         }
         catch (JsonException)
         {
-            // A malformed claim means no roles, not a failed authentication.
+            // Повреждённый claim означает отсутствие ролей, а не провал аутентификации.
             return [];
         }
     }

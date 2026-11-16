@@ -8,17 +8,17 @@ using MimeKit.Utils;
 namespace EmailSenderService.Services;
 
 /// <summary>
-/// Builds the <see cref="MimeMessage"/>, checks it against the relay's size limit and hands it
-/// to <see cref="ISmtpTransport"/>. This API is the only place that limit is enforced before
-/// the relay itself, so the check runs on the fully encoded message, not on an estimate.
+/// Собирает <see cref="MimeMessage"/>, проверяет его на лимит размера релея и передаёт в
+/// <see cref="ISmtpTransport"/>. Этот API - единственное место до самого релея, где этот лимит
+/// соблюдается, поэтому проверяется полностью закодированное письмо, а не оценка.
 /// </summary>
 public sealed class SmtpEmailSender(
     IOptionsMonitor<SmtpOptions> optionsMonitor,
     ISmtpTransport transport,
     ILogger<SmtpEmailSender> logger) : IEmailSender
 {
-    // SMTP puts CRLF on the wire; FormatOptions.Default uses the platform newline, which on
-    // Linux would under-count every line of base64 by one byte.
+    // SMTP передаёт CRLF; FormatOptions.Default использует перевод строки платформы, из-за чего
+    // на Linux каждая строка base64 недосчитывалась бы на один байт.
     private static readonly FormatOptions WireFormat = CreateWireFormat();
 
     public async Task<SendEmailResponse> SendAsync(
@@ -26,12 +26,12 @@ public sealed class SmtpEmailSender(
         IReadOnlyList<EmailAttachment>? attachments,
         CancellationToken cancellationToken)
     {
-        // Read through the monitor on every send so a rotated credential takes effect as soon
-        // as the configuration source behind it reloads.
+        // Читаем через монитор при каждой отправке, чтобы сменённые учётные данные начинали
+        // действовать сразу после перезагрузки источника конфигурации.
         var options = optionsMonitor.CurrentValue;
 
-        // Not disposed: disposing the message would close the attachment streams, which belong
-        // to the caller and are released by it once this method returns.
+        // Не освобождаем: Dispose письма закрыл бы потоки вложений, а они принадлежат вызывающему
+        // коду и освобождаются им после возврата из этого метода.
         var message = BuildMessage(request, attachments, options);
 
         var messageBytes = await MeasureAsync(message, cancellationToken);
@@ -53,9 +53,10 @@ public sealed class SmtpEmailSender(
     }
 
     /// <summary>
-    /// Fixes every part's transfer encoding for the strictest (7-bit) transport first, so the
-    /// size measured here is what goes on the wire - MailKit's own Prepare leaves explicitly
-    /// encoded parts alone. Bcc is still written here, so the result errs slightly high.
+    /// Сначала фиксирует кодировку передачи каждой части под самый строгий (7-битный) транспорт,
+    /// чтобы измеренный здесь размер совпадал с тем, что уйдёт в сеть, - собственный Prepare в
+    /// MailKit не трогает части с явно заданной кодировкой. Bcc здесь ещё записывается, поэтому
+    /// результат слегка завышен.
     /// </summary>
     private static async Task<long> MeasureAsync(MimeMessage message, CancellationToken cancellationToken)
     {
@@ -102,8 +103,8 @@ public sealed class SmtpEmailSender(
             body.TextBody = request.Body;
         }
 
-        // Added as ready-made parts over the caller's stream: BodyBuilder's file and byte
-        // overloads would copy the content into memory. Any attachment makes it multipart/mixed.
+        // Добавляем готовыми частями поверх потока вызывающего: перегрузки BodyBuilder для файлов
+        // и байтов скопировали бы содержимое в память. Любое вложение делает письмо multipart/mixed.
         foreach (var attachment in attachments ?? [])
         {
             body.Attachments.Add(CreateAttachmentPart(attachment));
@@ -123,8 +124,8 @@ public sealed class SmtpEmailSender(
             FileName = attachment.FileName
         };
 
-        // MimeKit encodes non-ASCII names per RFC 2231 by default, which Outlook shows as
-        // garbage; RFC 2047 encoded-words are what it (and most other clients) decode.
+        // По умолчанию MimeKit кодирует не-ASCII имена по RFC 2231, и Outlook показывает их
+        // как мусор; он (как и большинство других клиентов) декодирует encoded-words RFC 2047.
         foreach (var parameter in part.ContentType.Parameters.Concat(part.ContentDisposition.Parameters))
         {
             parameter.EncodingMethod = ParameterEncodingMethod.Rfc2047;

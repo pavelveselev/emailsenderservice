@@ -1,6 +1,6 @@
 namespace EmailSenderService.Models;
 
-/// <param name="MessageId">Message-Id header generated for the message; use it to correlate with relay logs.</param>
-/// <param name="RecipientCount">Total addresses on the envelope (To + Cc + Bcc).</param>
-/// <param name="SentAtUtc">When the relay accepted the message.</param>
+/// <param name="MessageId">Сгенерированный для письма заголовок Message-Id; по нему можно сопоставить с логами релея.</param>
+/// <param name="RecipientCount">Всего адресов в конверте (To + Cc + Bcc).</param>
+/// <param name="SentAtUtc">Момент, когда релей принял письмо.</param>
 public sealed record SendEmailResponse(string MessageId, int RecipientCount, DateTimeOffset SentAtUtc);
